@@ -146,6 +146,19 @@ _UI = {
     "PNG image": "Εικόνα PNG",
     "3D model (glTF)": "Τρισδιάστατο μοντέλο (glTF)",
     "All files": "Όλα τα αρχεία",
+    # the website (web/)
+    "Copy as a picture for Word or PowerPoint (Ctrl+C)": "Αντιγραφή ως εικόνα για Word ή PowerPoint (Ctrl+C)",
+    "Download as editable shapes for PowerPoint or Word, .pptx (Ctrl+Shift+S)":
+        "Λήψη ως επεξεργάσιμα σχήματα για PowerPoint ή Word, .pptx (Ctrl+Shift+S)",
+    "Copied figure: paste into Word or PowerPoint (right-click > Convert to Shape to edit it)":
+        "Η φιγούρα αντιγράφηκε: επικολλήστε τη στο Word ή στο PowerPoint"
+        " (δεξί κλικ > Μετατροπή σε σχήμα για επεξεργασία)",
+    "Copied figure as an image: paste into Word or PowerPoint":
+        "Η φιγούρα αντιγράφηκε ως εικόνα: επικολλήστε τη στο Word ή στο PowerPoint",
+    "Browsers can't copy 3D models: export one (Ctrl+Shift+E), then use Insert > 3D Models in Office":
+        "Τα προγράμματα περιήγησης δεν αντιγράφουν τρισδιάστατα μοντέλα: κάντε εξαγωγή (Ctrl+Shift+E)"
+        " και μετά Εισαγωγή > Τρισδιάστατα μοντέλα στο Office",
+    "Copying needs a secure page (https)": "Η αντιγραφή χρειάζεται ασφαλή σελίδα (https)",
 }
 
 # Exercise categories and names (exercises.CATEGORIES).  Names without an

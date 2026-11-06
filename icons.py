@@ -162,6 +162,15 @@ def _save_3d(p):
     p.line((3, 12), (3, 17), (17, 17), (17, 12))
 
 
+def _save_shapes(p):
+    """A small figure over a tray: download the figure as shapes (the website's PowerPoint file)."""
+    p.ring((10, 3.6), 1.8)
+    p.line((10, 5.6), (10, 9.2))
+    p.line((7, 7.8), (10, 6.4), (13, 7.8))
+    p.line((7.8, 12), (10, 9.2), (12.2, 12))
+    p.line((3, 12), (3, 17), (17, 17), (17, 12))
+
+
 def _undo(p):
     p.arc_arrow((11, 11.5), 6, 6, -50, 175)
 
@@ -360,6 +369,7 @@ ICONS = {
     "copy": (_copy, False, 0),
     "copy_3d": (_copy_3d, False, 0),
     "save_3d": (_save_3d, False, 0),
+    "save_shapes": (_save_shapes, False, 0),
     "undo": (_undo, False, 0),
     "redo": (_undo, True, 0),
     "reset": (_reset, False, 0),

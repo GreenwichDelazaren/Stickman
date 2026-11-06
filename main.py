@@ -38,21 +38,12 @@ import props
 import scene
 import skeleton as sk
 from i18n import tr
-from scene import (BONE_RADIUS, FACE, LIGHT_DIR, SIDE_COLORS, TATTOO_COLOR, TATTOO_FONT, TATTOO_PAD, TATTOO_TEXT,
-                   VIEW_ANGLES, Camera, Tattoo, face_meshes, tattoo_mesh)
+from scene import (BACKGROUND, BONE_RADIUS, FACE, FLOOR_COLOR, FLOOR_HALF, GRID_COLOR, GRID_STEP, LIGHT_DIR,
+                   SHADOW_COLOR, SIDE_COLORS, TATTOO_COLOR, TATTOO_FONT, TATTOO_PAD, TATTOO_TEXT, VIEW_ANGLES,
+                   Camera, Tattoo, face_meshes, tattoo_mesh)
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 POSES_DIR = os.path.join(APP_DIR, "poses")
-
-FLOOR_HALF = 3.0
-GRID_STEP = 0.5
-
-BACKGROUND = (0.84, 0.88, 0.92)
-FLOOR_COLOR = (0.95, 0.95, 0.93)
-GRID_COLOR = (0.78, 0.79, 0.78)
-SHADOW_COLOR = (0.74, 0.75, 0.74)
-SELECTED_COLOR = (1.00, 0.82, 0.10)
-PINNED_COLOR = (0.15, 0.72, 0.35)
 
 
 def tattoo_image():
@@ -239,15 +230,7 @@ class ExerciseMenu:
     def rows(self):
         """[(category, exercise)] matching the query, with (category, None) as the heading of each category."""
         if self._rows[0] != (self.query, i18n.language):
-            words = i18n.fold(self.query).split()
-            rows = []
-            for category, items in ex.CATEGORIES:
-                found = [e for e in items
-                         if all(w in i18n.fold(" ".join(i18n.variants(e.name) | i18n.variants(category)))
-                                for w in words)]
-                if found:
-                    rows += [(category, None)] + [(category, e) for e in found]
-            self._rows = ((self.query, i18n.language), rows)
+            self._rows = ((self.query, i18n.language), scene.search_exercises(self.query))
         return self._rows[1]
 
     # --- layout ------------------------------------------------------------
@@ -977,19 +960,12 @@ class App:
             glVertex3f(FLOOR_HALF, 0.0, v)
         glEnd()
 
-    def joint_style(self, skel, i, clean):
-        color, scale = SIDE_COLORS[skel.side(i)][1], 1.0
+    def highlights(self, skel, clean):
+        """(selected, hovered) joint indices in skel, None for neither."""
         if clean:
-            return color, scale
-        if i in skel.pins:
-            color, scale = PINNED_COLOR, 1.35
-        if skel is self.skel and i == self.selected:
-            color = SELECTED_COLOR
-        elif self.hovered == (skel, i):
-            color = tuple(min(1.0, c + 0.25) for c in color)
-        if i == skel.index["head"]:
-            scale = 1.0
-        return color, scale
+            return None, None
+        return (self.selected if skel is self.skel else None,
+                self.hovered[1] if self.hovered and self.hovered[0] is skel else None)
 
     def draw_figure(self, skel, shadow=False, clean=False):
         pos = skel.pos
@@ -999,10 +975,11 @@ class App:
             if not shadow:
                 glColor3f(*SIDE_COLORS[skel.side(child)][0])
             self.cylinder(pos[parent], pos[child], BONE_RADIUS)
+        selected, hovered = self.highlights(skel, clean)
         for i, p in enumerate(pos):
             radius = skel.radii[i]
             if not shadow:
-                color, scale = self.joint_style(skel, i, clean)
+                color, scale = scene.joint_style(skel, i, selected, hovered, clean)
                 glColor3f(*color)
                 radius *= scale
             self.sphere(p, radius)
@@ -1014,17 +991,11 @@ class App:
     def draw_face(self, skel, clean):
         """The eyes and nose, which show which way the head faces. They turn with the head when it's
         hovered or selected (darker than the head, so they stay visible)."""
-        head = skel.index["head"]
-        selected = not clean and skel is self.skel and self.selected == head
-        hovered = not clean and self.hovered == (skel, head)
+        selected, hovered = self.highlights(skel, clean)
         glEnableClientState(GL_VERTEX_ARRAY)
         glEnableClientState(GL_NORMAL_ARRAY)
         for (_, _, color), (positions, normals, tris) in zip(FACE, face_meshes(skel)):
-            if selected:
-                color = tuple(c * 0.6 for c in SELECTED_COLOR)
-            elif hovered:
-                color = tuple(min(1.0, c + 0.25) for c in color)
-            glColor3f(*color)
+            glColor3f(*scene.face_color(skel, color, selected, hovered))
             positions, normals = positions.astype(np.float32), normals.astype(np.float32)  # alive until drawn
             glVertexPointer(3, GL_FLOAT, 0, positions)
             glNormalPointer(GL_FLOAT, 0, normals)

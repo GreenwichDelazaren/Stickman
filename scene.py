@@ -11,6 +11,7 @@ from typing import NamedTuple
 import numpy as np
 
 import exercises as ex
+import i18n
 import props
 import skeleton as sk
 from geometry import convex_hull, normalize
@@ -26,6 +27,14 @@ SIDE_COLORS = {  # side: (bone colour, joint colour)
     "r": ((0.66, 0.24, 0.20), (1.00, 0.42, 0.34)),
 }
 LIGHT_DIR = (0.4, 1.0, 0.6)  # towards the light
+SELECTED_COLOR = (1.00, 0.82, 0.10)
+PINNED_COLOR = (0.15, 0.72, 0.35)
+BACKGROUND = (0.84, 0.88, 0.92)
+FLOOR_COLOR = (0.95, 0.95, 0.93)
+GRID_COLOR = (0.78, 0.79, 0.78)
+SHADOW_COLOR = (0.74, 0.75, 0.74)
+FLOOR_HALF = 3.0  # metres from the centre to the floor's edge
+GRID_STEP = 0.5
 EYE_COLOR = (0.12, 0.36, 0.92)
 NOSE_COLOR = (0.38, 0.41, 0.44)
 
@@ -243,6 +252,19 @@ def find_exercise(name):
     return next((e for _, items in ex.CATEGORIES for e in items if e.name == name), None)
 
 
+def search_exercises(query):
+    """[(category, exercise)] of the exercises matching query (in English or the other language, accents
+    optional), with (category, None) as the heading of each category."""
+    words = i18n.fold(query).split()
+    rows = []
+    for category, items in ex.CATEGORIES:
+        found = [e for e in items
+                 if all(w in i18n.fold(" ".join(i18n.variants(e.name) | i18n.variants(category))) for w in words)]
+        if found:
+            rows += [(category, None)] + [(category, e) for e in found]
+    return rows
+
+
 def build_exercise(exercise, camera, size, limits_on=True):
     """(figures, equipment) of the exercise's positions side by side, seen from its best angle;
     turns the camera to that angle and frames them."""
@@ -329,6 +351,35 @@ def tattoo_mesh(skel, aspect):
     texcoords = np.column_stack([np.tile([0.0, 1.0], n + 1), np.repeat(1 - np.arange(n + 1) / n, 2)])
     tris = np.array([t for k in range(n) for t in ((2 * k, 2 * k + 1, 2 * k + 3), (2 * k, 2 * k + 3, 2 * k + 2))])
     return positions, normals, texcoords, tris
+
+
+def _lighter(color):
+    return tuple(min(1.0, c + 0.25) for c in color)
+
+
+def joint_style(skel, i, selected=None, hovered=None, clean=False):
+    """(colour, size factor) of joint i as drawn; selected and hovered are joint indices in this figure
+    (None for neither). Clean is the look of the exports: no highlights."""
+    color, scale = SIDE_COLORS[skel.side(i)][1], 1.0
+    if clean:
+        return color, scale
+    if i in skel.pins:
+        color, scale = PINNED_COLOR, 1.35
+    if i == selected:
+        color = SELECTED_COLOR
+    elif i == hovered:
+        color = _lighter(color)
+    if i == skel.index["head"]:
+        scale = 1.0
+    return color, scale
+
+
+def face_color(skel, color, selected=None, hovered=None):
+    """The colour of a FACE shape: it darkens to gold with the head selected, lightens with it hovered."""
+    head = skel.index["head"]
+    if selected == head:
+        return tuple(c * 0.6 for c in SELECTED_COLOR)
+    return _lighter(color) if hovered == head else color
 
 
 # --- exports -------------------------------------------------------------------

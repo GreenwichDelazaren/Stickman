@@ -15,6 +15,9 @@ pip install -r requirements.txt
 python main.py
 ```
 
+The same app also runs as a website, with the same exercises, posing and
+files: see [Website](#website) below.
+
 ## Controls
 
 Every action is on the toolbar at the top of the window (hover over a button
@@ -104,6 +107,39 @@ and older Word versions show a still picture.
 Ctrl+Shift+E saves the same model as a `.glb` file, upright and facing the
 front, for Insert → 3D Models → This Device in Office or for other 3D
 programs.
+
+## Website
+
+The `web/` folder turns the app into a website that needs no installation:
+it runs the same Python code (posing, joint limits, exercises, exports) in the
+browser. Build it and try it locally:
+
+```
+python web/build.py
+python web/serve.py      # then open http://localhost:8000
+```
+
+To publish it, upload everything in `web/dist` to any web host that serves
+static files (your own server, GitHub Pages, Netlify, ...). Use an `https://`
+address, which browsers need for copying to the clipboard. The page loads its
+Python runtime (Pyodide) and 3D library (Three.js) from the jsDelivr CDN, so
+the first visit downloads roughly 10–15 MB, which the browser then caches.
+
+The website has the same toolbar, keys, help (H) and languages as the app, and
+saves and opens the same pose files. Copying to Office works differently,
+because a web page can only put pictures on the clipboard, not Office shapes
+or 3D models:
+
+| Input | Action on the website |
+|---|---|
+| Ctrl+C | Copy the figure as a vector picture (SVG, with a PNG for other programs). In Word or PowerPoint, paste it, then right-click → Convert to Shape to get editable shapes |
+| Ctrl+Shift+S | Download the figure as editable shapes in a `.pptx`, exactly as the app's Ctrl+C makes them; open it and copy the group from there |
+| Ctrl+Shift+E | Download the 3D model (`.glb`), for Insert → 3D Models → This Device |
+| Ctrl+Shift+C | Not available: browsers can't copy 3D models (use Ctrl+Shift+E) |
+
+Ctrl+S, Ctrl+E and Ctrl+Shift+E open the browser's save dialog where it has
+one (Chrome, Edge) and download the file otherwise. The SVG copy needs a
+recent Chrome or Edge; other browsers copy the PNG only.
 
 ## How dragging works
 
