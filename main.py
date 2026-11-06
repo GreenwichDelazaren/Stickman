@@ -35,16 +35,15 @@ import i18n
 import icons
 import office_clip
 import props
+import scene
 import skeleton as sk
-from geometry import convex_hull, normalize
 from i18n import tr
+from scene import (BONE_RADIUS, FACE, LIGHT_DIR, SIDE_COLORS, TATTOO_COLOR, TATTOO_FONT, TATTOO_PAD, TATTOO_TEXT,
+                   VIEW_ANGLES, Camera, Tattoo, face_meshes, tattoo_mesh)
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 POSES_DIR = os.path.join(APP_DIR, "poses")
 
-FOV = 45.0
-BONE_RADIUS = 0.016
-PICK_PIXELS = 14
 FLOOR_HALF = 3.0
 GRID_STEP = 0.5
 
@@ -52,70 +51,8 @@ BACKGROUND = (0.84, 0.88, 0.92)
 FLOOR_COLOR = (0.95, 0.95, 0.93)
 GRID_COLOR = (0.78, 0.79, 0.78)
 SHADOW_COLOR = (0.74, 0.75, 0.74)
-SIDE_COLORS = {  # side: (bone colour, joint colour)
-    None: ((0.30, 0.32, 0.36), (0.55, 0.58, 0.63)),
-    "l": ((0.18, 0.34, 0.66), (0.30, 0.55, 1.00)),
-    "r": ((0.66, 0.24, 0.20), (1.00, 0.42, 0.34)),
-}
-LIGHT_DIR = (0.4, 1.0, 0.6)  # towards the light
 SELECTED_COLOR = (1.00, 0.82, 0.10)
 PINNED_COLOR = (0.15, 0.72, 0.35)
-EYE_COLOR = (0.12, 0.36, 0.92)
-NOSE_COLOR = (0.38, 0.41, 0.44)
-
-
-def _circle(cx, cy, r, n=24):
-    return [(cx + r * math.cos(2 * math.pi * k / n), cy + r * math.sin(2 * math.pi * k / n)) for k in range(n)]
-
-
-def _split_edges(points, n=6):
-    """The polygon with each edge cut into n pieces, so it can bend round the head."""
-    return [tuple(np.add(a, np.subtract(b, a) * k / n)) for a, b in zip(points, points[1:] + points[:1])
-            for k in range(n)]
-
-
-# The face, drawn flat on the head: (name, outline, colour), with the outlines in metres on the plane
-# touching the front of the head (x to the figure's left, y up), anticlockwise as seen from the front.
-FACE = [("left eye", _circle(0.038, 0.024, 0.016), EYE_COLOR),
-        ("right eye", _circle(-0.038, 0.024, 0.016), EYE_COLOR),
-        ("Nose", _split_edges([(0.0, 0.008), (-0.017, -0.036), (0.017, -0.036)]), NOSE_COLOR)]
-FACE_LIFT = 0.0015  # how far the face sits above the head's surface
-FACE_RINGS = 3
-
-
-def face_meshes(skel):
-    """[(positions, normals, triangles)] of each FACE shape wrapped onto the head; the last
-    len(outline) positions are the outline."""
-    head, frame = skel.pos[skel.index["head"]], skel.world[skel.index["head"]]
-    meshes = []
-    for _, outline, _ in FACE:
-        outline = np.array(outline)
-        centre, n = outline.mean(axis=0), len(outline)
-        flat = np.vstack([centre] + [centre + (outline - centre) * k / FACE_RINGS
-                                     for k in range(1, FACE_RINGS + 1)])
-        normals = np.column_stack([flat, np.full(len(flat), sk.HEAD_RADIUS)])
-        normals = normals / np.linalg.norm(normals, axis=1, keepdims=True) @ frame.T
-        tris = [(0, 1 + s, 1 + (s + 1) % n) for s in range(n)]
-        for k in range(1, FACE_RINGS):
-            a, b = 1 + (k - 1) * n, 1 + k * n
-            for s in range(n):
-                t = (s + 1) % n
-                tris += [(a + s, b + s, b + t), (a + s, b + t, a + t)]
-        meshes.append((head + normals * (sk.HEAD_RADIUS + FACE_LIFT), normals, np.array(tris)))
-    return meshes
-
-
-# The tattoo: white text on the outside of the left forearm, reading from the wrist towards the
-# elbow (so it reads left to right from the figure's left side when the arm is held forward).
-TATTOO_TEXT = "Lazaros.Filippidis@Gmail.com"
-TATTOO_COLOR = (1.0, 1.0, 1.0)
-TATTOO_BONE = "l_hand"         # the forearm: a bone is named by the joint at its far end
-TATTOO_SIDE = (1.0, 0.0, 0.6)  # where its middle faces, in the rest pose: outside and a bit forward
-TATTOO_HEIGHT = 0.012          # metres round the arm (the text's line height)
-TATTOO_MARGIN = 0.01           # least gap to the elbow and wrist
-TATTOO_FONT = ("arial", 64)    # font and pixel size of the image
-TATTOO_PAD = 4                 # transparent pixels round the text in the image
-TATTOO_SEGMENTS = 8
 
 
 def tattoo_image():
@@ -127,29 +64,6 @@ def tattoo_image():
     image.fill((255, 255, 255, 0))
     image.blit(text, (TATTOO_PAD, TATTOO_PAD))
     return image
-
-
-def tattoo_mesh(skel, aspect):
-    """(positions, normals, texcoords, triangles) of the tattoo, a strip wrapped round the forearm
-    halfway between the elbow and the wrist; aspect is the image's width / height. Texcoords run
-    from the top of the image (0) to the bottom (1), as in glTF. Vertex 2k, 2k + 1 are the wrist
-    and elbow ends of row k, with row 0 along the bottom of the letters."""
-    j = skel.index[TATTOO_BONE]
-    elbow, hand = skel.pos[skel.parent[j]], skel.pos[j]
-    axis = normalize(elbow - hand)  # the reading direction
-    out = skel.world[j] @ np.array(TATTOO_SIDE)
-    out = normalize(out - (out @ axis) * axis)
-    up = np.cross(out, axis)  # towards the top of the letters
-    room = np.linalg.norm(elbow - hand) - skel.radii[skel.parent[j]] - skel.radii[j] - 2 * TATTOO_MARGIN
-    height = min(TATTOO_HEIGHT, max(room, 0.001) / aspect)
-    radius, n = BONE_RADIUS + FACE_LIFT, TATTOO_SEGMENTS
-    angles = (np.arange(n + 1) / n - 0.5) * height / radius
-    normals = np.repeat(np.cos(angles)[:, None] * out + np.sin(angles)[:, None] * up, 2, axis=0)
-    along = np.tile([-0.5, 0.5], n + 1)[:, None] * (height * aspect) * axis
-    positions = (elbow + hand) / 2 + along + normals * radius
-    texcoords = np.column_stack([np.tile([0.0, 1.0], n + 1), np.repeat(1 - np.arange(n + 1) / n, 2)])
-    tris = np.array([t for k in range(n) for t in ((2 * k, 2 * k + 1, 2 * k + 3), (2 * k, 2 * k + 3, 2 * k + 2))])
-    return positions, normals, texcoords, tris
 
 
 HELP = [
@@ -204,16 +118,9 @@ ROTATE_KEYS = {
     pygame.K_w: ("pitch", 1), pygame.K_s: ("pitch", -1),
     pygame.K_a: ("roll", -1), pygame.K_d: ("roll", 1),
 }
-# Equipment in the Word export: cylinders up to this radius are drawn as lines, cut into pieces
-# this long so each piece sorts in front of or behind the figure where it passes.
-THIN_PROP, PROP_PIECE = 0.03, 0.2
-# Shape names for the Word export; a bone is named by the joint at its far end.
-BONE_NAMES = {"chest": "lower spine", "neck": "upper spine", "head": "neck", "shoulder": "collarbone",
-              "elbow": "upper arm", "hand": "forearm", "hip": "hip bone", "knee": "thigh",
-              "ankle": "shin", "toe": "foot"}
-
 LIFT_KEYS = {pygame.K_UP: 1, pygame.K_DOWN: -1}
-VIEWS = {pygame.K_1: (0, 5), pygame.K_2: (90, 5), pygame.K_3: (0, 89), pygame.K_4: (35, 15)}
+VIEWS = {pygame.K_1: VIEW_ANGLES["front"], pygame.K_2: VIEW_ANGLES["side"],
+         pygame.K_3: VIEW_ANGLES["top"], pygame.K_4: VIEW_ANGLES["angled"]}
 ZOOM_KEYS = {pygame.K_EQUALS: 1, pygame.K_PLUS: 1, pygame.K_KP_PLUS: 1,
              pygame.K_MINUS: -1, pygame.K_KP_MINUS: -1}
 # Held keys repeat after REPEAT_DELAY seconds, every REPEAT_INTERVAL seconds.
@@ -274,26 +181,6 @@ MENU_PLACEHOLDER = "Choose an exercise (Tab)"
 MENU_TWO = "2 positions"
 
 
-def perspective(fovy, aspect, near, far):
-    f = 1.0 / math.tan(math.radians(fovy) / 2)
-    return np.array([
-        [f / aspect, 0, 0, 0],
-        [0, f, 0, 0],
-        [0, 0, (far + near) / (near - far), 2 * far * near / (near - far)],
-        [0, 0, -1, 0],
-    ])
-
-
-def look_at(eye, target, up=(0.0, 1.0, 0.0)):
-    f = normalize(target - eye)
-    s = normalize(np.cross(f, up))
-    u = np.cross(s, f)
-    m = np.identity(4)
-    m[0, :3], m[1, :3], m[2, :3] = s, u, -f
-    m[:3, 3] = -m[:3, :3] @ eye
-    return m
-
-
 def gl_matrix(m):
     return np.ascontiguousarray(m.T, dtype=np.float32)
 
@@ -317,34 +204,6 @@ def ask_file(save, title, extension, kind):
     finally:
         root.destroy()
     return path or None
-
-
-class Camera:
-    def __init__(self):
-        self.yaw, self.pitch = VIEWS[pygame.K_4]
-        self.dist = 3.0
-        self.target = np.array([0.0, 0.9, 0.0])
-
-    def eye(self):
-        y, p = math.radians(self.yaw), math.radians(self.pitch)
-        return self.target + self.dist * np.array(
-            [math.cos(p) * math.sin(y), math.sin(p), math.cos(p) * math.cos(y)])
-
-    def matrices(self, aspect):
-        return perspective(FOV, aspect, 0.05, 100.0), look_at(self.eye(), self.target)
-
-    def orbit(self, dx, dy):
-        self.yaw -= dx * 0.4
-        self.pitch = min(89.0, max(-45.0, self.pitch + dy * 0.4))
-
-    def pan(self, dx, dy, height):
-        _, view = self.matrices(1.0)
-        right, up = view[0, :3], view[1, :3]
-        scale = 2 * self.dist * math.tan(math.radians(FOV) / 2) / height
-        self.target += (-right * dx + up * dy) * scale
-
-    def zoom(self, steps):
-        self.dist = min(20.0, max(0.5, self.dist * 0.9 ** steps))
 
 
 class ExerciseMenu:
@@ -572,11 +431,10 @@ class App:
         pygame.display.set_caption("Stickman Poser")
         self._open_window((1280, 800))
         self.font = pygame.font.SysFont("consolas", 15)
-        self.tattoo = tattoo_image()
-        self.tattoo_aspect = self.tattoo.get_width() / self.tattoo.get_height()
+        self.tattoo_surface = tattoo_image()
         png = io.BytesIO()
-        pygame.image.save(self.tattoo, png, "png")
-        self.tattoo_png = png.getvalue()  # for the 3D export
+        pygame.image.save(self.tattoo_surface, png, "png")
+        self.tattoo = Tattoo(*self.tattoo_surface.get_size(), png.getvalue())
         self._tattoo_texture = None       # made on first draw
         self.quadric = gluNewQuadric()
         gluQuadricNormals(self.quadric, GLU_SMOOTH)
@@ -656,53 +514,13 @@ class App:
     # --- projection helpers ------------------------------------------------
 
     def _update_matrices(self):
-        w, h = pygame.display.get_window_size()
-        self.size = (max(w, 1), max(h, 1))
-        self.proj, self.view = self.camera.matrices(self.size[0] / self.size[1])
-        self.pv = self.proj @ self.view
-        self.pv_inv = np.linalg.inv(self.pv)
+        self.v = scene.View(self.camera, pygame.display.get_window_size())
+        self.size, self.proj, self.view = self.v.size, self.v.proj, self.v.view
         self.menu.rect, self.menu.window = self.toolbar()[1], self.size
-
-    def project(self, p):
-        """World point -> (screen x, screen y, depth), or None if behind the camera."""
-        c = self.pv @ np.append(p, 1.0)
-        if c[3] <= 1e-6:
-            return None
-        w, h = self.size
-        return (c[0] / c[3] + 1) * 0.5 * w, (1 - c[1] / c[3]) * 0.5 * h, c[3]
-
-    def project_all(self, points):
-        """project() of each point, or None if any of them is behind the camera."""
-        projected = []
-        for p in points:
-            s = self.project(p)
-            if s is None:
-                return None
-            projected.append(s)
-        return projected
-
-    def mouse_ray(self, mx, my):
-        w, h = self.size
-        x, y = 2 * mx / w - 1, 1 - 2 * my / h
-        near = self.pv_inv @ (x, y, -1.0, 1.0)
-        far = self.pv_inv @ (x, y, 1.0, 1.0)
-        near, far = near[:3] / near[3], far[:3] / far[3]
-        return near, normalize(far - near)
 
     def pick(self, mx, my):
         """(figure, joint index) of the joint under the mouse, or None."""
-        f = 1 / math.tan(math.radians(FOV) / 2)
-        best, best_score = None, 0.0
-        for skel in self.figures:
-            for i, p in enumerate(skel.pos):
-                s = self.project(p)
-                if s is None:
-                    continue
-                radius_px = max(PICK_PIXELS, skel.radii[i] * f * self.size[1] / 2 / s[2])
-                score = math.hypot(s[0] - mx, s[1] - my) - radius_px
-                if score < best_score:
-                    best, best_score = (skel, i), score
-        return best
+        return scene.pick(self.figures, self.v, mx, my)
 
     # --- editing -----------------------------------------------------------
 
@@ -766,67 +584,26 @@ class App:
 
     def load_exercise(self, exercise):
         """Show the exercise's positions side by side, seen from its best angle."""
-        figures = [ex.build(p) for p in exercise.positions]
-        parts = [ex.equipment(p, figure) for p, figure in zip(exercise.positions, figures)]
-        self.camera.yaw, self.camera.pitch = exercise.view
-        self._update_matrices()
-        parts = ex.arrange(figures, self.view[0, :3], parts=parts)  # left to right on screen
-        for figure in figures:
-            figure.limits_on = self.skel.limits_on
+        figures, self.props = scene.build_exercise(exercise, self.camera, self.size, self.skel.limits_on)
         self.set_figures(figures)
         self.exercise = exercise.name
-        self.props = [part for group in parts for part in group]
-        self.frame_figures()
 
     def figures_bounds(self):
         """Corners of a box around the figures and the equipment."""
-        pos = np.concatenate([f.pos for f in self.figures] + [np.array(props.bounds(p)) for p in self.props])
-        return pos.min(axis=0), pos.max(axis=0)
-
-    def frame_figures(self):
-        """Aim the camera at the figures and move it back until they all fit."""
-        lo, hi = self.figures_bounds()
-        self.camera.target = (lo + hi) / 2
-        radius = float(np.linalg.norm(hi - lo)) / 2 + 0.15
-        half = math.radians(FOV) / 2
-        half = min(half, math.atan(math.tan(half) * self.size[0] / self.size[1]))
-        self.camera.dist = min(20.0, max(0.5, radius / math.sin(half)))
+        return scene.figures_bounds(self.figures, self.props)
 
     def begin_drag(self, j, mx, my, mods):
-        p = self.skel.pos[j].copy()
-        forward = normalize(self.camera.target - self.camera.eye())
         mode = "floor" if mods & CTRL else "vertical" if mods & SHIFT else self.drag_mode
-        if mode == "floor":
-            normal = np.array([0.0, 1.0, 0.0])
-        elif mode == "vertical":
-            normal = forward * (1.0, 0.0, 1.0)
-            normal = normalize(normal) if np.linalg.norm(normal) > 1e-3 else np.array([0.0, 0.0, 1.0])
-        else:
-            normal = forward
-        d = self.drag = {"joint": j, "mode": mode, "normal": normal, "point": p,
-                         "offset": np.zeros(3), "before": self.state(), "moved": False}
-        hit = self._drag_plane_hit(d, mx, my)
-        if hit is not None:
-            d["offset"] = p - hit
-
-    def _drag_plane_hit(self, d, mx, my):
-        origin, direction = self.mouse_ray(mx, my)
-        denom = direction @ d["normal"]
-        if abs(denom) < 1e-6:
-            return None
-        t = (d["point"] - origin) @ d["normal"] / denom
-        return origin + t * direction if t > 0 else None
+        self.drag = scene.begin_drag(self.skel, j, self.v, self.camera, mode, mx, my)
+        self.drag.update(before=self.state(), moved=False)
 
     def update_drag(self, mx, my):
         d = self.drag
         if d is None:
             return
-        hit = self._drag_plane_hit(d, mx, my)
-        if hit is None:
+        target = scene.drag_target(d, self.v, mx, my)
+        if target is None:
             return
-        target = hit + d["offset"]
-        if d["mode"] == "vertical":
-            target = np.array([d["point"][0], target[1], d["point"][2]])
         if not d["moved"]:
             self.push_undo(d["before"])
             d["moved"] = True
@@ -1067,16 +844,8 @@ class App:
         path = ask_file(True, "Save pose", ".json", "Pose")
         self._after_dialog()
         if path:
-            if len(self.figures) == 1:
-                data = self.skel.to_dict()
-            else:
-                data = {"version": 2, "figures": [figure.to_dict() for figure in self.figures]}
-            if self.exercise:
-                data["exercise"] = self.exercise
-            if self.props:
-                data["props"] = [props.to_dict(part) for part in self.props]
             with open(path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+                json.dump(scene.pose_file(self.figures, self.exercise, self.props), f, indent=2)
             self.say(tr("Saved {}").format(os.path.basename(path)))
 
     def open_pose(self):
@@ -1085,12 +854,11 @@ class App:
         if path:
             try:
                 with open(path, encoding="utf-8") as f:
-                    data = json.load(f)
-                parts = [props.from_dict(part) for part in data.get("props", [])]
+                    dicts, exercise, parts = scene.read_pose_file(json.load(f))
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 self.say(tr("Could not open pose: {}").format(exc))
                 return
-            self.edit(self.load_figures, data.get("figures") or [data], data.get("exercise"), parts)
+            self.edit(self.load_figures, dicts, exercise, parts)
             self.say(tr("Opened {}").format(os.path.basename(path)))
 
     def load_figures(self, dicts, exercise=None, parts=()):
@@ -1149,157 +917,13 @@ class App:
         self.say(tr("Copied figure as a 3D model: paste into Word or PowerPoint" if three_d
                     else "Copied figure: paste into Word or PowerPoint"))
 
-    def bone_name(self, child):
-        """A bone is named after the joint at its far end: l_elbow -> Left upper arm."""
-        joint = self.skel.names[child]
-        base = joint[2:] if self.skel.side(child) else joint
-        return tr(sk.pretty_name(joint.replace(base, BONE_NAMES[base]))).capitalize()
-
-    def figure_label(self, n):
-        """Prefix for the part names of figure n, when there is more than one."""
-        return tr("Figure {}: ").format(n + 1) if len(self.figures) > 1 else ""
-
     def model_parts(self):
-        """The figures as spheres, tubes and face meshes for the 3D export, and the equipment."""
-        parts = [{"kind": "mesh", "name": tr(part["name"]), "positions": positions, "normals": normals,
-                  "triangles": tris, "color": props.COLOR}
-                 for part in self.props for positions, normals, tris in [props.mesh(part)]]
-        for n, skel in enumerate(self.figures):
-            pos, label = skel.pos, self.figure_label(n)
-            parts += [{"kind": "tube", "name": label + self.bone_name(child), "a": pos[parent], "b": pos[child],
-                       "radius": BONE_RADIUS, "color": SIDE_COLORS[skel.side(child)][0]}
-                      for parent, child in skel.bones]
-            parts += [{"kind": "sphere", "name": label + tr(sk.pretty_name(name)).capitalize(), "center": pos[i],
-                       "radius": skel.radii[i], "color": SIDE_COLORS[skel.side(i)][1]}
-                      for i, name in enumerate(skel.names)]
-            parts += [{"kind": "mesh", "name": label + tr(name).capitalize(), "positions": positions,
-                       "normals": normals, "triangles": tris, "color": color}
-                      for (name, _, color), (positions, normals, tris) in zip(FACE, face_meshes(skel))]
-            positions, normals, texcoords, tris = tattoo_mesh(skel, self.tattoo_aspect)
-            parts.append({"kind": "mesh", "name": label + tr("Tattoo"), "positions": positions, "normals": normals,
-                          "triangles": tris, "texcoords": texcoords, "image": self.tattoo_png,
-                          "color": TATTOO_COLOR})
-        return parts
+        """The figures and the equipment as parts for the 3D export."""
+        return scene.model_parts(self.figures, self.props, self.tattoo)
 
     def figure_shapes(self):
         """The figures as flat 2D shapes from the current view, far to near."""
-        px = self.size[1] / 2 / math.tan(math.radians(FOV) / 2)  # pixels per metre at depth 1
-        items = []
-        for n, skel in enumerate(self.figures):
-            pos, label = skel.pos, self.figure_label(n)
-            nearest_bone = {}  # joint -> depth of the nearest bone ending there
-            for parent, child in skel.bones:
-                a, b = self.project(pos[parent]), self.project(pos[child])
-                if a is None or b is None:
-                    continue
-                depth = (a[2] + b[2]) / 2
-                for j in (parent, child):
-                    nearest_bone[j] = min(depth, nearest_bone.get(j, depth))
-                items.append((depth, {"kind": "line", "name": label + self.bone_name(child), "a": a[:2], "b": b[:2],
-                                      "width": 2 * BONE_RADIUS * px / depth,
-                                      "color": SIDE_COLORS[skel.side(child)][0]}))
-
-            head_depth = None
-            for i, p in enumerate(pos):
-                s = self.project(p)
-                if s is None:
-                    continue
-                # Joints cover the ends of their own bones, as the spheres do in 3D.
-                depth = min(s[2] - skel.radii[i], nearest_bone.get(i, math.inf) - 1e-6)
-                if i == skel.index["head"]:
-                    head_depth = depth
-                color = SIDE_COLORS[skel.side(i)][1]
-                items.append((depth, {"kind": "circle", "name": label + tr(sk.pretty_name(skel.names[i])).capitalize(),
-                                      "center": s[:2], "radius": skel.radii[i] * px / s[2], "color": color,
-                                      "outline": tuple(c * 0.6 for c in color)}))
-
-            # The face goes just in front of the head, if it's turned towards the camera.
-            eye = self.camera.eye()
-            for (name, outline, color), (positions, normals, _) in zip(FACE, face_meshes(skel)):
-                points = self.project_all(positions[-len(outline):])
-                if head_depth is None or points is None or normals[0] @ (eye - positions[0]) <= 0:
-                    continue
-                items.append((head_depth - 1e-6, {"kind": "polygon", "name": label + tr(name).capitalize(),
-                                                  "points": [s[:2] for s in points], "color": color,
-                                                  "outline": tuple(c * 0.6 for c in color)}))
-            tattoo = self.tattoo_shape(skel, px)
-            if tattoo is not None:
-                depth, shape = tattoo
-                items.append((depth, dict(shape, name=label + shape["name"])))
-        items += self.prop_shapes(px)
-        items.sort(key=lambda item: -item[0])
-        return [shape for _, shape in items]
-
-    def tattoo_shape(self, skel, px):
-        """(depth, shape) of the tattoo as a text box along the forearm, or None if it's turned away
-        or too small. It goes just in front of the forearm, behind the joints."""
-        positions, normals, _, _ = tattoo_mesh(skel, self.tattoo_aspect)
-        middle = TATTOO_SEGMENTS  # the middle row's vertices: wrist end, then elbow end
-        wrist, elbow = positions[middle], positions[middle + 1]
-        centre = (wrist + elbow) / 2
-        a, b, c = self.project(wrist), self.project(elbow), self.project(centre)
-        if a is None or b is None or c is None or normals[middle] @ (self.camera.eye() - centre) <= 0:
-            return None
-        length = math.hypot(b[0] - a[0], b[1] - a[1])
-        # The line height round the arm, but no more than fits the length the forearm shows.
-        height = min(np.linalg.norm(positions[0] - positions[-2]) * px / c[2], length / self.tattoo_aspect)
-        if height < 1.0:
-            return None
-        j = skel.index[TATTOO_BONE]
-        ends = self.project(skel.pos[skel.parent[j]]), self.project(skel.pos[j])
-        depth = (ends[0][2] + ends[1][2]) / 2 - 5e-7 if None not in ends else c[2]
-        return depth, {"kind": "text", "name": tr("Tattoo"), "text": TATTOO_TEXT, "center": c[:2],
-                       "width": length, "height": height,
-                       "angle": math.degrees(math.atan2(b[1] - a[1], b[0] - a[0])),
-                       "size": height * TATTOO_FONT[1] / self.tattoo.get_height(), "font": TATTOO_FONT[0],
-                       "bold": True, "color": TATTOO_COLOR}
-
-    def prop_shapes(self, px):
-        """[(depth, shape)] of the equipment for figure_shapes: box sides, thin cylinders as
-        lines and thick ones (plates, weights) as their outline plus the end facing the camera."""
-        eye, items = self.camera.eye(), []
-        for part in self.props:
-            name = tr(part["name"])
-            if part["kind"] == "box":
-                for normal, corners in props.box_faces(part):
-                    points = self.project_all(corners)
-                    if points is None or normal @ (eye - corners[0]) <= 0:
-                        continue
-                    # Sorted by its farthest corner, so it goes behind whatever rests on it.
-                    items.append((max(p[2] for p in points), self.prop_polygon(name, [p[:2] for p in points], normal)))
-                continue
-            a, b = part["a"], part["b"]
-            if part["radius"] <= THIN_PROP:
-                n = max(1, math.ceil(np.linalg.norm(b - a) / PROP_PIECE))
-                ends = [self.project(a + (b - a) * k / n) for k in range(n + 1)]
-                for p, q in zip(ends, ends[1:]):
-                    if p is not None and q is not None:
-                        depth = (p[2] + q[2]) / 2
-                        items.append((depth, {"kind": "line", "name": name, "a": p[:2], "b": q[:2],
-                                              "width": 2 * part["radius"] * px / depth, "color": props.COLOR}))
-                continue
-            ring_a, ring_b = props.rings(part)
-            points = self.project_all(np.concatenate([ring_a, ring_b]))
-            if points is None:
-                continue
-            axis = normalize(b - a)
-            side = eye - (a + b) / 2
-            depth = sum(p[2] for p in points) / len(points)
-            items.append((depth, self.prop_polygon(name, convex_hull([p[:2] for p in points]),
-                                                   normalize(side - (side @ axis) * axis))))
-            end_a, end_b = points[:len(ring_a)], points[len(ring_a):]
-            for end, normal, centre in ((end_a, -axis, a), (end_b, axis, b)):
-                if normal @ (eye - centre) > 0:
-                    items.append((depth - 1e-6, self.prop_polygon(name, [p[:2] for p in end], normal)))
-        return items
-
-    @staticmethod
-    def prop_polygon(name, points, normal):
-        """An equipment polygon, shaded about as the 3D view lights a surface facing normal."""
-        light = 0.5 + 0.75 * max(0.0, float(normal @ normalize(np.array(LIGHT_DIR))))
-        color = tuple(min(1.0, c * light) for c in props.COLOR)
-        return {"kind": "polygon", "name": name, "points": points, "color": color,
-                "outline": tuple(c * 0.6 for c in color)}
+        return scene.figure_shapes(self.figures, self.props, self.v, self.tattoo)
 
     # --- drawing -----------------------------------------------------------
 
@@ -1418,10 +1042,10 @@ class App:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
-            w, h = self.tattoo.get_size()
+            w, h = self.tattoo_surface.get_size()
             gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE,
-                              pygame.image.tobytes(self.tattoo, "RGBA"))  # row 0 at texcoord 0
-        positions, normals, texcoords, tris = tattoo_mesh(skel, self.tattoo_aspect)
+                              pygame.image.tobytes(self.tattoo_surface, "RGBA"))  # row 0 at texcoord 0
+        positions, normals, texcoords, tris = tattoo_mesh(skel, self.tattoo.aspect)
         positions, normals = positions.astype(np.float32), normals.astype(np.float32)  # alive until drawn
         texcoords = texcoords.astype(np.float32)
         glEnable(GL_TEXTURE_2D)
