@@ -105,6 +105,7 @@ _UI = {
     "Show / hide the help (H)": "Εμφάνιση / απόκρυψη βοήθειας (H)",
     "Language: English. Switch to Greek (T)": "Γλώσσα: Ελληνικά. Αλλαγή σε αγγλικά (T)",
     "About Stickman (I)": "Σχετικά με το Stickman (I)",
+    "Instructions": "Οδηγίες",
     # the info text (scene.ABOUT)
     "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.":
         "Δημιουργήστε εύκολα και γρήγορα σκίτσα ασκήσεων τοποθετώντας ένα τρισδιάστατο ανθρωπάκι σε διάφορες "

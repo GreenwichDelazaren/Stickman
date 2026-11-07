@@ -144,7 +144,7 @@ html, body {
 .row.heading { color: var(--dim); padding-left: 8px; cursor: default; }
 .row.empty { color: var(--dim); padding-left: 8px; cursor: default; }
 
-#help, #status, #tooltip {
+#status, #tooltip, .panel {
   position: fixed;
   margin: 0;
   padding: 8px;
@@ -154,18 +154,33 @@ html, body {
   white-space: pre;
   pointer-events: none;
 }
-#help { left: 10px; max-width: calc(100vw - 20px); overflow: hidden; }
+.panel { left: 10px; max-width: calc(100vw - 20px); overflow: hidden; white-space: normal; }
+.panel .title {
+  font: bold 17px/22px var(--font);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--hover);
+}
+.panel pre.body { margin: 0; font: inherit; white-space: pre; }
+.panel .ok {
+  display: block;
+  margin: 12px 0 0 auto;
+  min-width: 64px;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--button);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;  /* the rest of the box lets clicks through to the view */
+}
+.panel .ok:hover { background: var(--hover); }
+.panel .ok:focus-visible { outline: 2px solid var(--active); outline-offset: 1px; }
 #status { left: 10px; bottom: 10px; max-width: calc(100vw - 20px); overflow: hidden; text-overflow: ellipsis; }
 #tooltip { background: rgba(25, 30, 38, 0.96); z-index: 4; white-space: nowrap; }
-#info {
-  position: fixed;
-  left: 10px;
-  width: min(656px, calc(100vw - 20px));
-  padding: 8px;
-  background: rgba(25, 30, 38, 0.88);
-  font: 15px/18px var(--font);
-  pointer-events: none;
-}
+#info { width: min(656px, calc(100vw - 20px)); background: rgba(25, 30, 38, 0.88); }
 #info p { margin: 0; }
 #info p + p { margin-top: 18px; }
 
@@ -198,5 +213,5 @@ html, body {
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
 @media (max-width: 600px) {
-  #help, #status, #info { font-size: 12px; line-height: 15px; }
+  .panel, #status { font-size: 12px; line-height: 15px; }
 }

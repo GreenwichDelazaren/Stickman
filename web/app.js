@@ -62,6 +62,9 @@ const REPEAT_DELAY = 400, REPEAT_INTERVAL = 80, MESSAGE_TIME = 4000;
 const MENU_PLACEHOLDER = "Choose an exercise (Tab)", MENU_TWO = "2 positions";
 
 const $ = (id) => document.getElementById(id);
+// "?v=<build>": web/build.py puts it on app.js in index.html, and app.js puts it on the files it loads, so a
+// browser never mixes a cached file of one build with another's.
+const V = new URL(import.meta.url).search;
 const canvas = $("view");
 let py, app, C;            // Pyodide, bridge.app, bridge colours
 const tr = (text) => app.tr(text);
@@ -71,10 +74,10 @@ const tr = (text) => app.tr(text);
 async function start() {
   py = await loadPyodide();
   await py.loadPackage("numpy");
-  const files = await (await fetch("py/files.json")).json();
+  const files = await (await fetch("py/files.json" + V)).json();
   py.FS.mkdirTree("/stickman");
   await Promise.all(files.map(async (name) => {
-    const response = await fetch("py/" + name);
+    const response = await fetch("py/" + name + V);
     if (!response.ok) throw new Error(`py/${name}: ${response.status}`);
     py.FS.writeFile("/stickman/" + name, await response.text());
   }));
@@ -86,6 +89,11 @@ async function start() {
   buildToolbar();
   setupMenu();
   setupInput();
+  for (const box of document.querySelectorAll(".panel")) {  // the OK buttons of the help and info boxes
+    const ok = box.querySelector(".ok");
+    ok.addEventListener("pointerdown", (e) => { if (e.button === 0) { e.preventDefault(); doAction("close_panel"); } });
+    ok.addEventListener("click", (e) => { if (e.detail === 0) doAction("close_panel"); });  // keyboard
+  }
   resize();
   $("loading").remove();
   window.stickman = { py, app };  // for testing from the browser console
@@ -346,18 +354,20 @@ function updateHud(f) {
     messageUntil = performance.now() + MESSAGE_TIME;
   }
   showStatus(f.status);
-  const help = $("help");
+  const help = $("help"), info = $("info"), top = $("toolbar").offsetHeight + 8 + "px";
   help.hidden = !f.help;
-  help.textContent = f.help;
-  help.style.top = $("toolbar").offsetHeight + 8 + "px";
-  const info = $("info");
+  help.querySelector(".title").textContent = f.help_title;
+  help.querySelector(".body").textContent = f.help;
+  help.style.top = top;
   const paragraphs = JSON.stringify(f.info);
   if (info.dataset.text !== paragraphs) {  // only when it changed: shown, hidden or translated
     info.dataset.text = paragraphs;
     info.hidden = !f.info.length;
-    info.replaceChildren(...f.info.map((text) => Object.assign(document.createElement("p"), { textContent: text })));
+    info.querySelector(".title").textContent = f.info_title;
+    info.querySelector(".body").replaceChildren(
+      ...f.info.map((text) => Object.assign(document.createElement("p"), { textContent: text })));
   }
-  info.style.top = help.style.top;
+  info.style.top = top;
   for (const button of toolButtons) {
     const item = button.item;
     const active = item.mode ? f.active.drag_mode === item.mode
@@ -385,7 +395,7 @@ function setLanguage(lang) {
   language = lang;
   document.documentElement.lang = lang;
   for (const button of toolButtons) {
-    if (button.item.icon === "language") button.querySelector("img").src = `icons/flag_${lang}.png`;
+    if (button.item.icon === "language") button.querySelector("img").src = `icons/flag_${lang}.png${V}`;
   }
   $("menu-search").placeholder = tr("Type to search...");
   menuWidth = null;
@@ -520,7 +530,7 @@ function buildToolbar() {
       if (item.icon === "language") {
         img.className = "flag";  // its src is the current language's flag, set by setLanguage
       } else {
-        img.src = `icons/${item.icon}.png`;
+        img.src = `icons/${item.icon}.png${V}`;
       }
       button.append(img);
       button.addEventListener("pointerdown", (e) => pressTool(e, button));

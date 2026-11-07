@@ -169,6 +169,7 @@ TOOL_COLORS = {"bar": (25, 30, 38, 175), "button": (62, 70, 84, 255), "hover": (
 TOOL_SIZE, TOOL_ICON, TOOL_GAP, TOOL_GROUP_GAP, TOOL_MARGIN = 30, 20, 4, 14, 6
 
 INFO_WIDTH = 640  # widest line of the info text, in pixels
+PANEL_OK = "OK"   # the button that closes the help or info box
 
 MENU_COLORS = {"box": (25, 30, 38, 215), "list": (25, 30, 38, 240), "hover": (88, 99, 116, 255),
                "text": (235, 238, 242), "dim": (150, 160, 175)}
@@ -419,6 +420,7 @@ class App:
         pygame.display.set_caption("Stickman Poser")
         self._open_window((1280, 800))
         self.font = pygame.font.SysFont("consolas", 15)
+        self.title_font = pygame.font.SysFont("consolas", 17, bold=True)
         self.tattoo_surface = tattoo_image()
         png = io.BytesIO()
         pygame.image.save(self.tattoo_surface, png, "png")
@@ -443,6 +445,8 @@ class App:
         self.undo_stack, self.redo_stack = [], []
         self.show_help = False
         self.show_info = False         # the info text (scene.ABOUT)
+        self.panel_ok = self._panel_ok = None  # the help or info box's OK button: in the window, in the box
+        self.ok_hover = False
         self.message, self.message_until = "", 0.0
         self._hud_key, self._hud = None, []
         self.drag_mode = "screen"  # used when no modifier is held
@@ -608,6 +612,9 @@ class App:
         elif e.type == pygame.MOUSEBUTTONDOWN and e.button in (1, 2, 3) and (tool := self.tool_at(e.pos)) is not None:
             if e.button == 1 and tool >= 0:
                 self.press_tool(tool)
+        elif e.type == pygame.MOUSEBUTTONDOWN and e.button in (1, 2, 3) and self.over_ok(e.pos):
+            if e.button == 1:
+                self.close_panel()
         elif e.type == pygame.MOUSEBUTTONDOWN and e.button in (1, 2, 3):
             mods = pygame.key.get_mods()
             hit = self.pick(*e.pos) if e.button == 1 else None
@@ -641,7 +648,8 @@ class App:
                 self.menu.motion(e.pos)
                 tool = None if self.menu.is_open or self.menu.contains(e.pos) else self.tool_at(e.pos)
                 self.tool_hover = tool if tool is not None and tool >= 0 else None
-                self.hovered = self.pick(*e.pos) if tool is None and not self.menu.is_open \
+                self.ok_hover = tool is None and not self.menu.is_open and self.over_ok(e.pos)
+                self.hovered = self.pick(*e.pos) if tool is None and not self.ok_hover and not self.menu.is_open \
                     and not self.menu.contains(e.pos) else None
         elif e.type == pygame.MOUSEWHEEL:
             if not self.menu.wheel(e.y):
@@ -663,6 +671,10 @@ class App:
     @staticmethod
     def repeats(key, mod):
         return key in (REPEAT_CTRL_KEYS if mod & CTRL else REPEAT_KEYS)
+
+    def over_ok(self, pos):
+        """Whether pos is on the OK button of the help or info box."""
+        return bool(self.panel_ok and (self.show_help or self.show_info) and self.panel_ok.collidepoint(pos))
 
     def hold(self, key, mod, button):
         self.held = {"key": key, "mod": mod, "button": button, "next": time.time() + REPEAT_DELAY}
@@ -1135,16 +1147,44 @@ class App:
             surf.blit(r, (pad, pad + i * line_h))
         return w, h, pygame.image.tobytes(surf, "RGBA", True)
 
+    def _panel(self, title, lines, alpha=200):
+        """A text block with a title and an OK button at the bottom right: ((w, h, data), OK button rect in it)."""
+        pad, line_h, gap = 8, self.font.get_linesize(), 8
+        heading = self.title_font.render(title, True, TOOL_COLORS["icon"])
+        rendered = [self.font.render(line, True, TOOL_COLORS["icon"]) for line in lines]
+        label = self.font.render(PANEL_OK, True, TOOL_COLORS["icon"])
+        ok = pygame.Rect(0, 0, max(64, label.get_width() + 24), TOOL_SIZE - 4)
+        w = max([heading.get_width(), ok.width] + [r.get_width() for r in rendered]) + 2 * pad
+        body = pad + heading.get_height() + gap
+        h = body + line_h * len(lines) + 2 * gap + ok.height + pad
+        ok.bottomright = (w - pad, h - pad)
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        surf.fill((25, 30, 38, alpha))
+        surf.blit(heading, (pad, pad))
+        pygame.draw.line(surf, MENU_COLORS["hover"], (pad, body - gap // 2), (w - pad, body - gap // 2))
+        for i, r in enumerate(rendered):
+            surf.blit(r, (pad, body + i * line_h))
+        pygame.draw.rect(surf, TOOL_COLORS["hover" if self.ok_hover else "button"], ok, border_radius=4)
+        surf.blit(label, label.get_rect(center=ok.center))
+        return (w, h, pygame.image.tobytes(surf, "RGBA", True)), ok
+
+    def close_panel(self):
+        self.show_help = self.show_info = self.ok_hover = False
+
     def draw_hud(self):
         status = self.status_text()
-        key = (self.show_help, self.show_info, status, i18n.language, self.size[0])
+        key = (self.show_help, self.show_info, self.ok_hover, status, i18n.language, self.size[0])
         if key != self._hud_key:
             self._hud_key = key
             self._hud = []  # (block, at the top)
+            self._panel_ok = None
             if self.show_help:
-                self._hud.append((self._text_block(HELP_GREEK if i18n.language == "el" else HELP), True))
-            if self.show_info:
-                self._hud.append((self._text_block(self.info_lines(), alpha=225), True))
+                block, self._panel_ok = self._panel(tr(scene.HELP_TITLE),
+                                                    HELP_GREEK if i18n.language == "el" else HELP)
+                self._hud.append((block, True))
+            elif self.show_info:
+                block, self._panel_ok = self._panel(tr(scene.ABOUT_TITLE), self.info_lines(), alpha=225)
+                self._hud.append((block, True))
             if status:
                 self._hud.append((self._text_block([status]), False))
         glDisable(GL_DEPTH_TEST)
@@ -1155,6 +1195,7 @@ class App:
         self.menu.current = self.exercise
         menu = self.menu.draw()
         blocks = [(10, top if at_top else h - 10 - bh, bw, bh, data) for (bw, bh, data), at_top in self._hud]
+        self.panel_ok = self._panel_ok.move(10, top) if self._panel_ok else None  # for clicks, in window pixels
         for x, y, bw, bh, data in bar + blocks + menu + tips:  # (x, y) is the top-left corner
             glWindowPos2i(x, h - y - bh)
             glDrawPixels(bw, bh, GL_RGBA, GL_UNSIGNED_BYTE, data)

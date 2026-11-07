@@ -41,7 +41,10 @@ NOSE_COLOR = (0.38, 0.41, 0.44)
 # Camera angles (yaw, pitch) of the view keys 1-4.
 VIEW_ANGLES = {"front": (0, 5), "side": (90, 5), "top": (0, 89), "angled": (35, 15)}
 
-# The info button's text (I): paragraphs, translated with tr() where they're shown.
+# The info button's box (I): its title and paragraphs, translated with tr() where they're shown.
+VERSION = "1.0"
+ABOUT_TITLE = "Stickman v" + VERSION
+HELP_TITLE = "Instructions"
 ABOUT = [
     "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.",
     "Inspired by the simple stick-figure sketches my coach used to draw to illustrate exercises, I created "

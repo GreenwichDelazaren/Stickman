@@ -53,7 +53,7 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | Ctrl+Shift+C | Copy the figure as a 3D model, for pasting into Word or PowerPoint (Windows) |
 | Ctrl+Shift+E | Export a 3D model file (`.glb`) |
 | T | Switch language: Greek / English (the flag button) |
-| I | Show / hide what Stickman is and how it came about (the i button, first on the toolbar) |
+| I | Show / hide what Stickman is and how it came about (the i button, first on the toolbar). The OK button closes this box or the help |
 
 ## Exercises
 

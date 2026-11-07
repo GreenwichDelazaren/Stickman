@@ -7,6 +7,7 @@ locally:  python web/serve.py  and open http://localhost:8000.
 Needs pygame, only to draw the toolbar icons (icons.py).
 """
 
+import hashlib
 import json
 import os
 import shutil
@@ -46,7 +47,33 @@ def build():
     for name in icons.ICONS:
         size = FLAG_SIZE if name.startswith("flag_") else ICON_SIZE
         pygame.image.save(icons.icon(name, size * SCALE, ICON_COLOR), os.path.join(DIST, "icons", name + ".png"))
-    print(f"Built {DIST}: {len(modules)} Python modules, {len(icons.ICONS)} icons")
+    version = stamp()
+    print(f"Built {DIST}: {len(modules)} Python modules, {len(icons.ICONS)} icons, version {version}")
+
+
+def stamp():
+    """Put ?v=<hash of the build> on style.css and app.js in index.html; app.js puts the same on the
+    modules and icons it loads (V). Web hosts let browsers keep files for a while (GitHub Pages: 10
+    minutes), and without it a browser could run a new app.js with old modules."""
+    digest = hashlib.sha256()
+    for folder, dirs, names in sorted(os.walk(DIST)):
+        dirs.sort()
+        for name in sorted(names):
+            path = os.path.join(folder, name)
+            if path != os.path.join(DIST, "index.html"):
+                digest.update(os.path.relpath(path, DIST).replace(os.sep, "/").encode() + b"\0")
+                with open(path, "rb") as f:
+                    digest.update(f.read())
+    version = digest.hexdigest()[:10]
+    page = os.path.join(DIST, "index.html")
+    with open(page, encoding="utf-8") as f:
+        html = f.read()
+    for ref in ('href="style.css"', 'src="app.js"'):
+        assert ref in html, ref
+        html = html.replace(ref, ref[:-1] + f'?v={version}"')
+    with open(page, "w", encoding="utf-8", newline="") as f:
+        f.write(html)
+    return version
 
 
 if __name__ == "__main__":

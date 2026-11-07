@@ -278,6 +278,8 @@ class Editor:
             self.show_help, self.show_info = not self.show_help, False
         elif name == "info":
             self.show_info, self.show_help = not self.show_info, False
+        elif name == "close_panel":  # the OK button of the help or info box
+            self.show_help = self.show_info = False
         elif name == "language":
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
@@ -418,7 +420,9 @@ class Editor:
             "figures": [self._figure(skel, clean) for skel in self.figures],
             "status": self.status_text(), "message": self.message,
             "help": self.help_lines() if self.show_help else "",
+            "help_title": tr(scene.HELP_TITLE),
             "info": [tr(paragraph) for paragraph in scene.ABOUT] if self.show_info else [],
+            "info_title": tr(scene.ABOUT_TITLE),
             "active": {"limits": self.skel.limits_on, "help": self.show_help, "info": self.show_info,
                        "pin": self.selected is not None and self.selected in self.skel.pins,
                        "drag_mode": self.drag_mode},
