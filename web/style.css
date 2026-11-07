@@ -38,13 +38,17 @@ html, body {
   left: 0;
   right: 0;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
   padding: 6px;
   background: var(--bar);
+  z-index: 2;  /* the open exercise list goes over the help and info boxes */
   user-select: none;
   -webkit-user-select: none;
 }
+
+#tools { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 
 .group { display: flex; gap: 4px; }
 
@@ -67,7 +71,7 @@ html, body {
 .tool.active:hover, .tool.active.pressed { background: rgb(72, 130, 222); }
 .tool:focus-visible, #menu-box:focus-visible { outline: 2px solid var(--active); outline-offset: 1px; }
 
-#menu { position: relative; }
+#menu { position: relative; display: flex; max-width: 100%; }
 
 #menu-box, #menu-search {
   height: 30px;
@@ -114,7 +118,7 @@ html, body {
   left: 0;
   width: 100%;
   min-width: min(340px, calc(100vw - 12px));
-  max-height: min(calc(24 * 25px), calc(100vh - 60px));
+  max-height: min(calc(24 * 25px), calc(100vh - 100px));  /* set to the space below it when opened */
   overflow-y: auto;
   border-radius: 4px;
   background: var(--list);
@@ -153,6 +157,17 @@ html, body {
 #help { left: 10px; max-width: calc(100vw - 20px); overflow: hidden; }
 #status { left: 10px; bottom: 10px; max-width: calc(100vw - 20px); overflow: hidden; text-overflow: ellipsis; }
 #tooltip { background: rgba(25, 30, 38, 0.96); z-index: 4; white-space: nowrap; }
+#info {
+  position: fixed;
+  left: 10px;
+  width: min(656px, calc(100vw - 20px));
+  padding: 8px;
+  background: rgba(25, 30, 38, 0.88);
+  font: 15px/18px var(--font);
+  pointer-events: none;
+}
+#info p { margin: 0; }
+#info p + p { margin-top: 18px; }
 
 #loading {
   position: fixed;
@@ -183,5 +198,5 @@ html, body {
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
 
 @media (max-width: 600px) {
-  #help, #status { font-size: 12px; line-height: 15px; }
+  #help, #status, #info { font-size: 12px; line-height: 15px; }
 }

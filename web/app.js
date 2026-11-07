@@ -6,6 +6,7 @@ import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodi
 // Toolbar groups as main.TOOLBAR: icon (icons.ICONS name), tooltip (English, translated by i18n), and
 // either an action (a key's action, see keyAction) with an optional forced Shift, or a drag mode.
 const TOOLBAR = [
+  [{ icon: "info", tip: "About Stickman (I)", action: "info" }],
   [{ icon: "open", tip: "Open a pose (Ctrl+O)", action: "open" },
    { icon: "save", tip: "Save the pose (Ctrl+S)", action: "save" },
    { icon: "png", tip: "Export a PNG image (Ctrl+E)", action: "png" },
@@ -45,7 +46,7 @@ const TOOLBAR = [
 ];
 
 const KEYS = {
-  KeyH: "help", KeyT: "language", Tab: "menu", Escape: "escape", KeyP: "pin", KeyM: "mirror",
+  KeyH: "help", KeyI: "info", KeyT: "language", Tab: "menu", Escape: "escape", KeyP: "pin", KeyM: "mirror",
   KeyZ: "twist_minus", KeyX: "twist_plus", KeyL: "limits", KeyG: "ground", KeyR: "reset",
   KeyQ: "turn_left", KeyE: "turn_right", KeyW: "tip_forward", KeyS: "tip_back", KeyA: "lean_left", KeyD: "lean_right",
   ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre",
@@ -349,6 +350,14 @@ function updateHud(f) {
   help.hidden = !f.help;
   help.textContent = f.help;
   help.style.top = $("toolbar").offsetHeight + 8 + "px";
+  const info = $("info");
+  const paragraphs = JSON.stringify(f.info);
+  if (info.dataset.text !== paragraphs) {  // only when it changed: shown, hidden or translated
+    info.dataset.text = paragraphs;
+    info.hidden = !f.info.length;
+    info.replaceChildren(...f.info.map((text) => Object.assign(document.createElement("p"), { textContent: text })));
+  }
+  info.style.top = help.style.top;
   for (const button of toolButtons) {
     const item = button.item;
     const active = item.mode ? f.active.drag_mode === item.mode
@@ -497,7 +506,7 @@ function openPose(file) {
 const toolButtons = [];
 
 function buildToolbar() {
-  const bar = $("toolbar");
+  const bar = $("tools");
   for (const group of TOOLBAR) {
     const box = document.createElement("div");
     box.className = "group";
@@ -623,7 +632,10 @@ function openMenu() {
   search.value = "";
   $("menu-label").style.visibility = "hidden";
   fillMenu(lastFrame && lastFrame.exercise);
-  $("menu-list").hidden = false;
+  const list = $("menu-list");
+  list.hidden = false;
+  // Down to the bottom of the window: the list sits under the toolbar's rows of buttons.
+  list.style.maxHeight = `${Math.max(100, Math.min(24 * 25, window.innerHeight - list.getBoundingClientRect().top - 12))}px`;
   search.focus({ preventScroll: true });
 }
 

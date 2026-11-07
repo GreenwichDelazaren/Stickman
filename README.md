@@ -3,7 +3,7 @@
 Pose a 3D stick figure standing on a floor to illustrate exercises
 (pull-ups, push-ups, lunges, ...). Drag any joint with the mouse; bone lengths
 always stay the same. Or start from one of over 150 ready-made exercises in
-the list at the start of the toolbar.
+the list under the toolbar.
 
 The app starts in Greek. The flag button at the end of the toolbar (or T)
 switches between Greek and English; it shows the flag of the current language.
@@ -30,7 +30,7 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 
 | Input | Action |
 |---|---|
-| Tab, or click the list on the toolbar | Choose an exercise: type to search, Up/Down and Enter or click to pick, Esc to close |
+| Tab, or click the list under the toolbar | Choose an exercise: type to search, Up/Down and Enter or click to pick, Esc to close |
 | Left-drag a joint | Move it parallel to the screen |
 | Ctrl + left-drag | Move it parallel to the floor |
 | Shift + left-drag | Move it straight up/down |
@@ -53,10 +53,11 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | Ctrl+Shift+C | Copy the figure as a 3D model, for pasting into Word or PowerPoint (Windows) |
 | Ctrl+Shift+E | Export a 3D model file (`.glb`) |
 | T | Switch language: Greek / English (the flag button) |
+| I | Show / hide what Stickman is and how it came about (the i button, first on the toolbar) |
 
 ## Exercises
 
-The list at the start of the toolbar holds over 150 exercises in ten groups: basic
+The list under the toolbar holds over 150 exercises in ten groups: basic
 positions, legs and glutes, push, pull, arms and shoulders, core, cardio and
 plyometrics, running drills, stretching and yoga. Click it (or press Tab),
 type part of a name or group ("squat", "core") to narrow it down, then pick
@@ -126,7 +127,7 @@ address, which browsers need for copying to the clipboard. The page loads its
 Python runtime (Pyodide) and 3D library (Three.js) from the jsDelivr CDN, so
 the first visit downloads roughly 10–15 MB, which the browser then caches.
 
-The website has the same toolbar, keys, help (H) and languages as the app, and
+The website has the same toolbar, keys, help (H), info (I) and languages as the app, and
 saves and opens the same pose files. Copying to Office works differently,
 because a web page can only put pictures on the clipboard, not Office shapes
 or 3D models:

@@ -28,7 +28,7 @@ VIEWS = {"view_front": "front", "view_side": "side", "view_top": "top", "view_an
 ZOOM = {"zoom_in": 1, "zoom_out": -1}
 
 HELP = [
-    "Tab or the list on the toolbar: pick an exercise (type to search)",
+    "Tab or the list under the toolbar: pick an exercise (type to search)",
     "Left-drag a joint ............ move it (bone lengths stay fixed)",
     "   + Ctrl .................... move parallel to the floor",
     "   + Shift ................... move straight up / down",
@@ -47,12 +47,13 @@ HELP = [
     "Ctrl+Shift+S download editable shapes (.pptx)",
     "Ctrl+Shift+E export 3D model (.glb)",
     "T  language: Greek / English (the flag button)",
+    "I  about Stickman (the i button)",
     "Hold a key or toolbar button to repeat it",
     "Colours: blue = left, red = right, green = pinned",
     "H  hide help",
 ]
 HELP_GREEK = [
-    "Tab ή η λίστα στη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
+    "Tab ή η λίστα κάτω από τη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
     "Σύρσιμο άρθρωσης ............. μετακίνηση (τα μήκη των οστών μένουν ίδια)",
     "   + Ctrl .................... παράλληλα με το δάπεδο",
     "   + Shift ................... κατακόρυφα πάνω / κάτω",
@@ -71,6 +72,7 @@ HELP_GREEK = [
     "Ctrl+Shift+S λήψη ως επεξεργάσιμα σχήματα (.pptx)",
     "Ctrl+Shift+E εξαγωγή τρισδιάστατου μοντέλου (.glb)",
     "T  γλώσσα: Ελληνικά / English (το κουμπί με τη σημαία)",
+    "I  σχετικά με το Stickman (το κουμπί i)",
     "Κρατήστε πατημένο ένα πλήκτρο ή κουμπί για επανάληψη",
     "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
     "H  απόκρυψη βοήθειας",
@@ -97,6 +99,7 @@ class Editor:
         self.press_pos = (0, 0)
         self.undo_stack, self.redo_stack = [], []
         self.show_help = False
+        self.show_info = False         # the info text (scene.ABOUT)
         self.drag_mode = "screen"       # used when no modifier is held
         self.message = ""               # for app.js to show, taken by frame()
         self.tattoo = scene.Tattoo(1, 1, b"")
@@ -272,7 +275,9 @@ class Editor:
         elif name == "redo":
             self.redo()
         elif name == "help":
-            self.show_help = not self.show_help
+            self.show_help, self.show_info = not self.show_help, False
+        elif name == "info":
+            self.show_info, self.show_help = not self.show_info, False
         elif name == "language":
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
@@ -413,7 +418,8 @@ class Editor:
             "figures": [self._figure(skel, clean) for skel in self.figures],
             "status": self.status_text(), "message": self.message,
             "help": self.help_lines() if self.show_help else "",
-            "active": {"limits": self.skel.limits_on, "help": self.show_help,
+            "info": [tr(paragraph) for paragraph in scene.ABOUT] if self.show_info else [],
+            "active": {"limits": self.skel.limits_on, "help": self.show_help, "info": self.show_info,
                        "pin": self.selected is not None and self.selected in self.skel.pins,
                        "drag_mode": self.drag_mode},
             "exercise": self.exercise, "exercise_label": tr(self.exercise) if self.exercise else "",

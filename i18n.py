@@ -104,6 +104,20 @@ _UI = {
     "Zoom out (- or mouse wheel)": "Σμίκρυνση (- ή ροδέλα ποντικιού)",
     "Show / hide the help (H)": "Εμφάνιση / απόκρυψη βοήθειας (H)",
     "Language: English. Switch to Greek (T)": "Γλώσσα: Ελληνικά. Αλλαγή σε αγγλικά (T)",
+    "About Stickman (I)": "Σχετικά με το Stickman (I)",
+    # the info text (scene.ABOUT)
+    "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.":
+        "Δημιουργήστε εύκολα και γρήγορα σκίτσα ασκήσεων τοποθετώντας ένα τρισδιάστατο ανθρωπάκι σε διάφορες "
+        "στάσεις.",
+    "Inspired by the simple stick-figure sketches my coach used to draw to illustrate exercises, I created "
+    "Stickman with the help of Artificial Intelligence (AI). The application allows users to pose a 3D stick "
+    "figure in different positions, making it quick and easy to create exercise illustrations for workout "
+    "programmes. It is available both as a desktop application and through a website.":
+        "Εμπνευσμένος από τα απλά σκίτσα με ανθρωπάκια που σχεδίαζε ο προπονητής μου για να απεικονίζει "
+        "ασκήσεις, δημιούργησα με τη βοήθεια της Τεχνητής Νοημοσύνης το Stickman. Η εφαρμογή επιτρέπει την "
+        "τοποθέτηση ενός τρισδιάστατου ανθρώπινου μοντέλου σε διάφορες στάσεις, διευκολύνοντας τη γρήγορη "
+        "δημιουργία σκίτσων ασκήσεων για προγράμματα προπόνησης. Διατίθεται τόσο ως εφαρμογή για υπολογιστές "
+        "όσο και μέσω ιστοσελίδας.",
     # exercise list
     "Choose an exercise (Tab)": "Επιλογή άσκησης (Tab)",
     "2 positions": "2 θέσεις",

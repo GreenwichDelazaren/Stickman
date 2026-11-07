@@ -316,6 +316,12 @@ FLAG = (1.0, 4.0, 19.0, 16.0)  # left, top, right, bottom
 FLAG_WHITE = (255, 255, 255, 255)
 
 
+def _info(p):
+    p.ring((10, 10), 8.2)
+    p.dot((10, 5.9), 1.3)
+    p.line((10, 9), (10, 14.6), w=2.2)
+
+
 def _rect(p, x0, y0, x1, y1, color):
     p.fill((x0, y0), (x1, y0), (x1, y1), (x0, y1), color=color)
 
@@ -399,6 +405,7 @@ ICONS = {
     "zoom_in": (_zoom(1), False, 0),
     "zoom_out": (_zoom(-1), False, 0),
     "help": (_help, False, 0),
+    "info": (_info, False, 0),
     "flag_el": (_flag_greece, False, 0),
     "flag_en": (_flag_uk, False, 0),
 }

@@ -41,6 +41,15 @@ NOSE_COLOR = (0.38, 0.41, 0.44)
 # Camera angles (yaw, pitch) of the view keys 1-4.
 VIEW_ANGLES = {"front": (0, 5), "side": (90, 5), "top": (0, 89), "angled": (35, 15)}
 
+# The info button's text (I): paragraphs, translated with tr() where they're shown.
+ABOUT = [
+    "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.",
+    "Inspired by the simple stick-figure sketches my coach used to draw to illustrate exercises, I created "
+    "Stickman with the help of Artificial Intelligence (AI). The application allows users to pose a 3D stick "
+    "figure in different positions, making it quick and easy to create exercise illustrations for workout "
+    "programmes. It is available both as a desktop application and through a website.",
+]
+
 
 def _circle(cx, cy, r, n=24):
     return [(cx + r * math.cos(2 * math.pi * k / n), cy + r * math.sin(2 * math.pi * k / n)) for k in range(n)]

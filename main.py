@@ -58,7 +58,7 @@ def tattoo_image():
 
 
 HELP = [
-    "Tab or the list on the toolbar: pick an exercise (type to search)",
+    "Tab or the list under the toolbar: pick an exercise (type to search)",
     "Left-drag a joint ............ move it (bone lengths stay fixed)",
     "   + Ctrl .................... move parallel to the floor",
     "   + Shift ................... move straight up / down",
@@ -76,12 +76,13 @@ HELP = [
     "Ctrl+C copy as editable shapes  Ctrl+Shift+C copy as 3D model",
     "Ctrl+Shift+E export 3D model (.glb)",
     "T  language: Greek / English (the flag button)",
+    "I  about Stickman (the i button)",
     "Hold a key or toolbar button to repeat it",
     "Colours: blue = left, red = right, green = pinned",
     "H  hide help",
 ]
 HELP_GREEK = [
-    "Tab ή η λίστα στη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
+    "Tab ή η λίστα κάτω από τη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
     "Σύρσιμο άρθρωσης ............. μετακίνηση (τα μήκη των οστών μένουν ίδια)",
     "   + Ctrl .................... παράλληλα με το δάπεδο",
     "   + Shift ................... κατακόρυφα πάνω / κάτω",
@@ -99,6 +100,7 @@ HELP_GREEK = [
     "Ctrl+C αντιγραφή ως επεξεργάσιμα σχήματα  Ctrl+Shift+C ως τρισδιάστατο μοντέλο",
     "Ctrl+Shift+E εξαγωγή τρισδιάστατου μοντέλου (.glb)",
     "T  γλώσσα: Ελληνικά / English (το κουμπί με τη σημαία)",
+    "I  σχετικά με το Stickman (το κουμπί i)",
     "Κρατήστε πατημένο ένα πλήκτρο ή κουμπί για επανάληψη",
     "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
     "H  απόκρυψη βοήθειας",
@@ -124,6 +126,7 @@ CTRL, SHIFT = pygame.KMOD_CTRL, pygame.KMOD_SHIFT
 # current language).  An action is a (key, modifiers) pair, so a click does exactly what the key does, or a
 # drag mode name.  Tooltips are translated with tr() when shown.
 TOOLBAR = [
+    [("info", "About Stickman (I)", (pygame.K_i, 0))],
     [("open", "Open a pose (Ctrl+O)", (pygame.K_o, CTRL)),
      ("save", "Save the pose (Ctrl+S)", (pygame.K_s, CTRL)),
      ("png", "Export a PNG image (Ctrl+E)", (pygame.K_e, CTRL)),
@@ -165,6 +168,8 @@ TOOL_COLORS = {"bar": (25, 30, 38, 175), "button": (62, 70, 84, 255), "hover": (
                "active": (46, 104, 196, 255), "icon": (235, 238, 242)}
 TOOL_SIZE, TOOL_ICON, TOOL_GAP, TOOL_GROUP_GAP, TOOL_MARGIN = 30, 20, 4, 14, 6
 
+INFO_WIDTH = 640  # widest line of the info text, in pixels
+
 MENU_COLORS = {"box": (25, 30, 38, 215), "list": (25, 30, 38, 240), "hover": (88, 99, 116, 255),
                "text": (235, 238, 242), "dim": (150, 160, 175)}
 MENU_PAD, MENU_MAX_ROWS = 8, 24
@@ -198,8 +203,8 @@ def ask_file(save, title, extension, kind):
 
 
 class ExerciseMenu:
-    """The drop-down list of exercises (exercises.CATEGORIES) at the start of
-    the toolbar.  Open, it lists them by category and typing filters the list
+    """The drop-down list of exercises (exercises.CATEGORIES) on its own row
+    under the toolbar buttons.  Open, it lists them by category and typing filters the list
     (matching the English or the Greek, accents optional); choosing one calls
     on_choose(exercise)."""
 
@@ -437,6 +442,7 @@ class App:
         self.press_pos = (0, 0)
         self.undo_stack, self.redo_stack = [], []
         self.show_help = False
+        self.show_info = False         # the info text (scene.ABOUT)
         self.message, self.message_until = "", 0.0
         self._hud_key, self._hud = None, []
         self.drag_mode = "screen"  # used when no modifier is held
@@ -685,7 +691,9 @@ class App:
                 self.copy_to_clipboard(three_d=bool(shift))
             return
         if key == pygame.K_h:
-            self.show_help = not self.show_help
+            self.show_help, self.show_info = not self.show_help, False
+        elif key == pygame.K_i:
+            self.show_info, self.show_help = not self.show_info, False
         elif key == pygame.K_t:
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
@@ -749,12 +757,11 @@ class App:
 
     def toolbar(self):
         """[(rect, (icon, tooltip, action))] for the current window width, the
-        exercise list's rect and the toolbar height.  The list comes first; groups
-        wrap onto a new row when they don't fit."""
+        exercise list's rect and the toolbar height.  Groups wrap onto a new row
+        when they don't fit; the list has a row of its own under the buttons."""
         width = self.size[0]
         if self._tools[0] != (width, i18n.language):  # the list's width depends on the language
-            menu = pygame.Rect(TOOL_MARGIN, TOOL_MARGIN, self.menu.width, TOOL_SIZE)
-            items, x, y = [], menu.right + TOOL_GROUP_GAP, TOOL_MARGIN
+            items, x, y = [], TOOL_MARGIN, TOOL_MARGIN
             for group in TOOLBAR:
                 if x > TOOL_MARGIN and x + len(group) * (TOOL_SIZE + TOOL_GAP) - TOOL_GAP > width - TOOL_MARGIN:
                     x, y = TOOL_MARGIN, y + TOOL_SIZE + TOOL_GAP
@@ -762,7 +769,9 @@ class App:
                     items.append((pygame.Rect(x, y, TOOL_SIZE, TOOL_SIZE), item))
                     x += TOOL_SIZE + TOOL_GAP
                 x += TOOL_GROUP_GAP - TOOL_GAP
-            self._tools = ((width, i18n.language), items, menu, y + TOOL_SIZE + TOOL_MARGIN)
+            y += TOOL_SIZE + TOOL_GAP
+            menu = pygame.Rect(TOOL_MARGIN, y, max(1, min(self.menu.width, width - 2 * TOOL_MARGIN)), TOOL_SIZE)
+            self._tools = ((width, i18n.language), items, menu, menu.bottom + TOOL_MARGIN)
         return self._tools[1:]
 
     def tool_at(self, pos):
@@ -788,7 +797,7 @@ class App:
     def tool_active(self, action):
         if isinstance(action, str):
             return self.drag_mode == action
-        return {(pygame.K_l, 0): self.skel.limits_on, (pygame.K_h, 0): self.show_help,
+        return {(pygame.K_l, 0): self.skel.limits_on, (pygame.K_h, 0): self.show_help, (pygame.K_i, 0): self.show_info,
                 (pygame.K_p, 0): self.selected in self.skel.pins}.get(action, False)
 
     def draw_toolbar(self):
@@ -1097,6 +1106,24 @@ class App:
             parts.append(self.message)
         return "  |  ".join(parts)
 
+    def _wrap(self, text, width):
+        """Text broken into lines no wider than width pixels (at spaces)."""
+        lines = []
+        for word in text.split():
+            if lines and self.font.size(lines[-1] + " " + word)[0] <= width:
+                lines[-1] += " " + word
+            else:
+                lines.append(word)
+        return lines
+
+    def info_lines(self):
+        """scene.ABOUT in the current language, wrapped to the window, with a blank line between paragraphs."""
+        width = min(INFO_WIDTH, self.size[0] - 36)
+        lines = []
+        for paragraph in scene.ABOUT:
+            lines += ([""] if lines else []) + self._wrap(tr(paragraph), width)
+        return lines
+
     def _text_block(self, lines, alpha=175):
         pad, line_h = 8, self.font.get_linesize()
         rendered = [self.font.render(line, True, (235, 238, 242)) for line in lines]
@@ -1110,12 +1137,14 @@ class App:
 
     def draw_hud(self):
         status = self.status_text()
-        key = (self.show_help, status, i18n.language)
+        key = (self.show_help, self.show_info, status, i18n.language, self.size[0])
         if key != self._hud_key:
             self._hud_key = key
             self._hud = []  # (block, at the top)
             if self.show_help:
                 self._hud.append((self._text_block(HELP_GREEK if i18n.language == "el" else HELP), True))
+            if self.show_info:
+                self._hud.append((self._text_block(self.info_lines(), alpha=225), True))
             if status:
                 self._hud.append((self._text_block([status]), False))
         glDisable(GL_DEPTH_TEST)
