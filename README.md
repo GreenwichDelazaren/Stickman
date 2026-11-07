@@ -16,7 +16,8 @@ python main.py
 ```
 
 The same app also runs as a website, with the same exercises, posing and
-files: see [Website](#website) below.
+files: try it at https://greenwichdelazaren.github.io/Stickman/ or see
+[Website](#website) below.
 
 ## Controls
 
