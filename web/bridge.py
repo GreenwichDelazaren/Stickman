@@ -77,6 +77,43 @@ HELP_GREEK = [
     "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
     "H  απόκρυψη βοήθειας",
 ]
+# The same on a touch screen, where there are no keys, Shift or right button.
+HELP_TOUCH = [
+    "The list under the buttons: pick an exercise",
+    "Drag a joint: move it (bone lengths stay fixed)",
+    "Drag empty space: orbit the camera",
+    "Two fingers: pinch to zoom, move to pan",
+    "The top row opens groups of buttons; press a button to see its name",
+    "File: open, save, export, about, language",
+    "Edit: reset, put on the floor, joint limits",
+    "Drag: move joints along the screen, the floor, or up / down",
+    "Joint (tap a joint first): pin, mirror, twist",
+    "Figure: raise, lower, turn, tip, lean",
+    "View: front, side, top, angled, centre, zoom, this help",
+    "Hold a button to repeat it",
+    "Colours: blue = left, red = right, green = pinned",
+]
+HELP_TOUCH_GREEK = [
+    "Η λίστα κάτω από τα κουμπιά: επιλογή άσκησης",
+    "Σύρσιμο άρθρωσης: μετακίνηση (τα μήκη των οστών μένουν ίδια)",
+    "Σύρσιμο σε κενό σημείο: περιστροφή κάμερας",
+    "Δύο δάχτυλα: τσίμπημα για ζουμ, κίνηση για μετατόπιση",
+    "Η επάνω σειρά ανοίγει ομάδες κουμπιών· πατήστε ένα κουμπί για να δείτε το όνομά του",
+    "Αρχείο: άνοιγμα, αποθήκευση, εξαγωγή, πληροφορίες, γλώσσα",
+    "Επεξεργασία: επαναφορά, στο δάπεδο, όρια αρθρώσεων",
+    "Σύρσιμο: μετακίνηση αρθρώσεων στην οθόνη, στο δάπεδο ή πάνω / κάτω",
+    "Άρθρωση (πατήστε πρώτα μια άρθρωση): καρφίτσωμα, αντιγραφή πλευράς, περιστροφή",
+    "Φιγούρα: ανύψωση, χαμήλωμα, στροφή, κλίση",
+    "Προβολή: πρόσοψη, πλάγια, κάτοψη, υπό γωνία, κεντράρισμα, ζουμ, αυτή η βοήθεια",
+    "Κρατήστε πατημένο ένα κουμπί για επανάληψη",
+    "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
+]
+# Messages that name keys, as they read on a touch screen.
+TOUCH_MESSAGES = {
+    "Click a joint first, then press P to pin it": "Tap a joint first, then pin it",
+    "Click a joint first, then press Z/X to twist it": "Tap a joint first, then twist it",
+    "Pose reset (Ctrl+Z to undo)": "Pose reset (undo brings it back)",
+}
 
 
 def _flat(array):
@@ -103,6 +140,7 @@ class Editor:
         self.drag_mode = "screen"       # used when no modifier is held
         self.message = ""               # for app.js to show, taken by frame()
         self.tattoo = scene.Tattoo(1, 1, b"")
+        self.touch = False              # a touch screen: help and messages without keys
         self.update_view()
 
     # --- view ----------------------------------------------------------------
@@ -118,8 +156,15 @@ class Editor:
         """The tattoo image app.js drew (white text on transparent, as PNG bytes)."""
         self.tattoo = scene.Tattoo(int(width), int(height), bytes(png.to_py() if hasattr(png, "to_py") else png))
 
+    def set_touch(self, on):
+        self.touch = bool(on)
+
     def say(self, text):
         self.message = text
+
+    def hint(self, text):
+        """Say a message that names keys, in its touch wording on a touch screen."""
+        self.say(tr(TOUCH_MESSAGES[text] if self.touch else text))
 
     # --- editing (as main.App) ---------------------------------------------------
 
@@ -212,10 +257,12 @@ class Editor:
 
     # --- mouse ---------------------------------------------------------------------
 
-    def press(self, x, y, button, ctrl, shift):
+    def press(self, x, y, button, ctrl, shift, touch=False):
         """A press on the view (button 0 left, 1 middle, 2 right): "drag", "orbit" or "pan"."""
         self.update_view()
-        hit = scene.pick(self.figures, self.v, x, y) if button == 0 else None
+        self.press_selection = self.skel, self.selected  # for cancel_drag
+        pixels = scene.PICK_PIXELS_TOUCH if touch else scene.PICK_PIXELS
+        hit = scene.pick(self.figures, self.v, x, y, pixels) if button == 0 else None
         self.press_pos = (x, y)
         if hit is not None:
             self.skel, self.selected = hit
@@ -258,6 +305,15 @@ class Editor:
             self.selected = None  # a click on empty space
         self.drag = self.camera_drag = None
 
+    def cancel_drag(self):
+        """Take back a joint drag that turned out to be the first finger of a pinch."""
+        if self.drag is None:
+            return
+        if self.drag["moved"]:
+            self.set_state(self.undo_stack.pop())
+        self.skel, self.selected = self.press_selection
+        self.drag = None
+
     def zoom(self, steps):
         self.camera.zoom(steps)
         self.update_view()
@@ -290,7 +346,7 @@ class Editor:
                 self.edit(self.skel.clear_pins)
                 self.say(tr("All pins removed"))
             elif sel is None:
-                self.say(tr("Click a joint first, then press P to pin it"))
+                self.hint("Click a joint first, then press P to pin it")
             else:
                 self.edit(self.skel.toggle_pin, sel)
         elif name == "mirror":
@@ -303,7 +359,7 @@ class Editor:
                              "r": "Copied right side onto the other side"}[side]))
         elif name in ("twist_minus", "twist_plus"):
             if sel is None:
-                self.say(tr("Click a joint first, then press Z/X to twist it"))
+                self.hint("Click a joint first, then press Z/X to twist it")
             else:
                 before = self.state()
                 step = (5 if shift else 15) * (1 if name == "twist_plus" else -1)
@@ -325,7 +381,7 @@ class Editor:
             self.edit(self.skel.drop_to_ground)
         elif name == "reset":
             self.edit(self.reset)
-            self.say(tr("Pose reset (Ctrl+Z to undo)"))
+            self.hint("Pose reset (Ctrl+Z to undo)")
         elif name in VIEWS:
             self.camera.yaw, self.camera.pitch = scene.VIEW_ANGLES[VIEWS[name]]
         elif name == "centre":
@@ -356,6 +412,19 @@ class Editor:
         self.push_undo(before)
         self.say(tr("Opened {}").format(name))
 
+    def autosave(self):
+        """The pose file to keep in case Android closes the app, or "" if nothing has been edited."""
+        return self.pose_json() if self.undo_stack else ""
+
+    def restore(self, text):
+        """Put back what autosave() returned, as it was: no undo step, no message, and framed."""
+        try:
+            self.load_figures(*scene.read_pose_file(json.loads(text)))
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError):
+            return
+        self.camera.frame(*scene.figures_bounds(self.figures, self.props), self.size)
+        self.update_view()
+
     def svg(self):
         return svg.build_svg(scene.figure_shapes(self.figures, self.props, self.v, self.tattoo), "Stickman")
 
@@ -371,6 +440,8 @@ class Editor:
         return tr(text)
 
     def help_lines(self):
+        if self.touch:
+            return "\n".join(HELP_TOUCH_GREEK if i18n.language == "el" else HELP_TOUCH)
         return "\n".join(HELP_GREEK if i18n.language == "el" else HELP)
 
     def status_text(self):

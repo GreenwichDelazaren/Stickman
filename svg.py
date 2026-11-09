@@ -4,9 +4,7 @@ The website puts this on the clipboard: Office pastes it as a picture that "Conv
 turns into editable shapes.  Shapes are drawn in order, later ones on top.
 """
 
-from xml.sax.saxutils import escape, quoteattr
-
-from office_clip import extent
+from office_clip import escape, extent, quoteattr
 
 
 def _hex(color):

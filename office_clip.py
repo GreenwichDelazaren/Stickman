@@ -24,12 +24,22 @@ import struct
 import sys
 import time
 import zipfile
-from xml.sax.saxutils import escape, quoteattr
 
 GVML_FORMAT = "Art::GVML ClipFormat"
 MODEL_FORMAT = "model/gltf-binary"
 CF_DIB = 8
 EMU_PER_PIXEL = 9525  # at 96 dpi
+
+
+# As xml.sax.saxutils, whose import pulls in urllib, http and email: seconds of starting up on a phone.
+def escape(text):
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def quoteattr(text):
+    text = escape(text).replace('"', "&quot;").replace("\n", "&#10;").replace("\r", "&#13;").replace("\t", "&#9;")
+    return f'"{text}"'
+
 
 _CONTENT_TYPES = (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'

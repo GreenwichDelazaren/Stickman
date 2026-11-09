@@ -22,6 +22,12 @@ The stand-alone Windows program is built with PyInstaller (not in `requirements.
 python -m PyInstaller --noconfirm stickman.spec    # -> "dist/Stickman Poser.exe", one file, no console
 ```
 
+The Android app is built with (needs `ANDROID_HOME` and a JDK 17+; `--release` also needs `android/keystore.properties`):
+
+```
+python android/build.py [--release]    # -> "dist/Stickman Poser.apk"
+```
+
 There is no test suite or linter config. Everything except `main.py` and `icons.py` is free of pygame/OpenGL, so pose logic and the exports can be checked headlessly:
 
 ```
@@ -31,7 +37,7 @@ python -c "import scene, svg; c = scene.Camera(); f, p = scene.build_exercise(sc
 
 ## Architecture
 
-A desktop app for posing a 3D stick figure (for illustrating exercises), in Greek (the default) and English, and a static website (`web/`) that runs the same Python modules in the browser. Twelve modules:
+A desktop app for posing a 3D stick figure (for illustrating exercises), in Greek (the default) and English, a static website (`web/`) that runs the same Python modules in the browser, and an Android app (`android/`) that is that website in a WebView. Twelve modules:
 
 - `geometry.py`: vector/rotation helpers (`rotation_between`, `angle_about`, `toward`, `MIRROR`, ...).
 - `joint_limits.py`: range of motion data (`RANGE_OF_MOTION`) and the two limit types, `Cone` (ball joint with swing boundary + twist range) and `Hinge` (one-way bend).
@@ -108,9 +114,19 @@ A single figure is saved as exactly that dict. Several figures are saved as `{"v
 - Files: save/export use `showSaveFilePicker` where the browser has it, else a download; open uses a file input. Pose files are the same format as the desktop's.
 - Clipboard: a browser can only write standard types, not GVML or `model/gltf-binary`. Ctrl+C writes `image/svg+xml` (`svg.build_svg`, where `ClipboardItem.supports` says so) and `image/png`. Word and PowerPoint paste the SVG as a vector graphic (Word inline shape type 17, PowerPoint shape type 28), and Convert to Shape (`CommandBars.ExecuteMso("SVGEdit")`) turns it into editable shapes; this was checked by copying from a visible Edge window (Playwright) and pasting through COM. Ctrl+Shift+S downloads the exact shapes as a `.pptx`; Ctrl+Shift+C only explains that 3D models can't be copied. The clipboard needs https (or localhost).
 - `window.stickman = {py, app}` is there for testing from the console or Playwright.
+- Touch screens: `coarse` in `app.js` (`(pointer: coarse)`, so desktop browsers keep the normal toolbar) builds the toolbar as `TABS` over the same `TOOLBAR` items, with a `@media (pointer: coarse)` block in `style.css`. `Editor.set_touch` switches to `HELP_TOUCH` / `HELP_TOUCH_GREEK` and, through `hint`, the wording in `TOUCH_MESSAGES`. `press(..., touch)` picks with `PICK_PIXELS_TOUCH`. A second finger turns an orbit, or a joint drag that has only just begun (`canPinch`, `cancel_drag`), into a pinch: `app.zoom` plus a pan through button 1; a real joint drag ignores it. Touch input never hovers.
+
+### Android (android/)
+
+- `android/build.py` runs `web/build.py`, copies `web/dist` to `android/generated/assets/site`, downloads what `app.js` imports from the CDN (once, into `android/cache`, the versions read from `app.js`) into `site/vendor`, and rewrites the two imports in the *copy*; the website keeps its CDN imports. With Node.js on the PATH, `android/precompile.mjs` swaps the copied numpy wheel's `.py` files for `.pyc` (made by that same Pyodide, under Node) and the build updates its sha256 in the copied `pyodide-lock.json`, because Pyodide's numpy has only sources and compiling them is seconds of every start on a phone. It renders the launcher icon from `icons.app_icon` and runs Gradle. `android/generated` is made fresh each time and not in git.
+- `MainActivity.kt` serves the assets through `WebViewAssetLoader` at `https://appassets.androidplatform.net/` (a secure context; its own MIME table, because modules and WebAssembly need the exact types). Keep the editing logic in Python and the page logic in `app.js`: the Kotlin only does what a WebView can't.
+- `window.StickmanHost` (`save`, `share`) is how `app.js` knows it's in the app; `saveFile` and `copyFigure` branch on it. Blob downloads and image clipboard writes don't work in a WebView. The app calls back `window.stickmanSaved(name, ok)` and, for the back button, `window.stickmanBack()`.
+- In the app only, the pose is autosaved to `localStorage` when the page is hidden (`Editor.autosave`, only once something was edited) and put back at start (`Editor.restore`), because Android can close the app behind the file and share dialogs.
+- Start-up time matters here (about 20 s before tuning): `start()` in `app.js` leaves `performance.mark`s for each stage, so check `performance.getEntriesByType("mark")` after changes. Keep heavy standard-library imports out of the shared modules' top level (`office_clip` has its own `escape`/`quoteattr` because `xml.sax.saxutils` pulls in urllib, http and email).
+- Debug builds allow WebView remote debugging (`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`), so `window.stickman` works there too.
 
 ## Keeping docs in sync
 
-The controls are listed in four places for the desktop: the key handling in `App.on_key`/`App.handle`, the `TOOLBAR` buttons and `HELP` / `HELP_GREEK` overlay lines in `main.py`, and the controls table in `README.md`. The website has its own copies: `TOOLBAR` and `KEYS` in `web/app.js`, `Editor.action` and `HELP` / `HELP_GREEK` in `web/bridge.py`, and the Website section of `README.md`. Update all of them together. (The exercise list is the one control that isn't a toolbar button.)
+The controls are listed in four places for the desktop: the key handling in `App.on_key`/`App.handle`, the `TOOLBAR` buttons and `HELP` / `HELP_GREEK` overlay lines in `main.py`, and the controls table in `README.md`. The website has its own copies: `TOOLBAR` and `KEYS` in `web/app.js`, `Editor.action` and `HELP` / `HELP_GREEK` in `web/bridge.py`, and the Website section of `README.md`. Touch screens and the Android app add `TABS` in `web/app.js` (which group each toolbar group goes under), `HELP_TOUCH` / `HELP_TOUCH_GREEK` and `TOUCH_MESSAGES` in `web/bridge.py`, and the touch table and Android section of `README.md`. Update all of them together. (The exercise list is the one control that isn't a toolbar button.)
 
 New user-visible text goes through `tr()` with a Greek entry in `i18n.GREEK` (new tooltips and messages too). For exercise names, add a Greek name only when there's an established Greek term; otherwise leave it out and it shows in English.

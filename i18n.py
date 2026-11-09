@@ -145,6 +145,14 @@ _UI = {
     "Exported {}": "Η εξαγωγή ολοκληρώθηκε: {}",
     "Could not open pose: {}": "Δεν ήταν δυνατό το άνοιγμα της πόζας: {}",
     "Could not copy: {}": "Δεν ήταν δυνατή η αντιγραφή: {}",
+    "Could not save {}": "Δεν ήταν δυνατή η αποθήκευση του {}",
+    # Touch screens (the website on a phone and the Android app)
+    "File": "Αρχείο", "Edit": "Επεξεργασία", "Drag": "Σύρσιμο", "Joint": "Άρθρωση", "Figure": "Φιγούρα",
+    "View": "Προβολή",
+    "Share as a picture": "Κοινοποίηση ως εικόνα",
+    "Tap a joint first, then pin it": "Πατήστε πρώτα μια άρθρωση και μετά καρφιτσώστε την",
+    "Tap a joint first, then twist it": "Πατήστε πρώτα μια άρθρωση και μετά περιστρέψτε την",
+    "Pose reset (undo brings it back)": "Επαναφορά πόζας (η αναίρεση τη φέρνει πίσω)",
     "Copied figure: paste into Word or PowerPoint": "Η φιγούρα αντιγράφηκε: επικολλήστε τη στο Word ή στο PowerPoint",
     "Copied figure as a 3D model: paste into Word or PowerPoint":
         "Η φιγούρα αντιγράφηκε ως τρισδιάστατο μοντέλο: επικολλήστε τη στο Word ή στο PowerPoint",

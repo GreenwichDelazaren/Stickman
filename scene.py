@@ -20,6 +20,7 @@ from i18n import tr
 FOV = 45.0
 BONE_RADIUS = 0.016
 PICK_PIXELS = 14
+PICK_PIXELS_TOUCH = 28  # a finger is less exact than a mouse
 
 SIDE_COLORS = {  # side: (bone colour, joint colour)
     None: ((0.30, 0.32, 0.36), (0.55, 0.58, 0.63)),
@@ -202,8 +203,9 @@ class View:
         return near, normalize(far - near)
 
 
-def pick(figures, view, mx, my):
-    """(figure, joint index) of the joint under the mouse, or None."""
+def pick(figures, view, mx, my, pixels=PICK_PIXELS):
+    """(figure, joint index) of the joint under the mouse, or None. Every joint can be hit from at
+    least `pixels` away."""
     f = 1 / math.tan(math.radians(FOV) / 2)
     best, best_score = None, 0.0
     for skel in figures:
@@ -211,7 +213,7 @@ def pick(figures, view, mx, my):
             s = view.project(p)
             if s is None:
                 continue
-            radius_px = max(PICK_PIXELS, skel.radii[i] * f * view.size[1] / 2 / s[2])
+            radius_px = max(pixels, skel.radii[i] * f * view.size[1] / 2 / s[2])
             score = math.hypot(s[0] - mx, s[1] - my) - radius_px
             if score < best_score:
                 best, best_score = (skel, i), score

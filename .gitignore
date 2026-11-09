@@ -3,3 +3,13 @@ __pycache__/
 web/dist/
 /build/
 /dist/
+android/cache/
+android/generated/
+android/.gradle/
+android/.kotlin/
+android/app/build/
+android/build/
+android/local.properties
+android/keystore.properties
+*.jks
+*.keystore

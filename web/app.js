@@ -61,7 +61,20 @@ const SHIFT_STEPS = new Set([...REPEAT].filter((a) => a !== "undo" && a !== "red
 const REPEAT_DELAY = 400, REPEAT_INTERVAL = 80, MESSAGE_TIME = 4000;
 const MENU_PLACEHOLDER = "Choose an exercise (Tab)", MENU_TWO = "2 positions";
 
+// On a touch screen the groups of TOOLBAR (by index) go under tabs, so the buttons can be big enough for
+// a finger and still leave room for the figure. Undo and redo stay on the tabs' row.
+const TABS = [{ icon: "open", tip: "File", groups: [1, 0, 7] }, { icon: "reset", tip: "Edit", groups: [2] },
+              { icon: "drag_screen", tip: "Drag", groups: [3] }, { icon: "pin", tip: "Joint", groups: [4] },
+              { icon: "turn_left", tip: "Figure", groups: [5] }, { icon: "view_angled", tip: "View", groups: [6] }];
+const ALWAYS_SHOWN = new Set(["undo", "redo"]);
+const TIP_TIME = 1500;       // how long pressing a button shows its name on a touch screen
+const PINCH_HOLD = 200;      // ms: a second finger this soon after the first makes a pinch, even from a joint
+const ZOOM_STEP = -Math.log(0.9);  // scene.Camera.zoom multiplies the distance by 0.9 per step
+const AUTOSAVE_KEY = "stickman-pose";
+
 const $ = (id) => document.getElementById(id);
+const coarse = window.matchMedia("(pointer: coarse)").matches;  // a phone or tablet
+const host = window.StickmanHost;  // the Android app (android/.../MainActivity.kt), which saves and shares files
 // "?v=<build>": web/build.py puts it on app.js in index.html, and app.js puts it on the files it loads, so a
 // browser never mixes a cached file of one build with another's.
 const V = new URL(import.meta.url).search;
@@ -72,8 +85,12 @@ const tr = (text) => app.tr(text);
 // --- start -----------------------------------------------------------------------
 
 async function start() {
+  // The marks are for timing a start: performance.getEntriesByType("mark").
+  performance.mark("libraries loaded");
   py = await loadPyodide();
+  performance.mark("Python started");
   await py.loadPackage("numpy");
+  performance.mark("numpy loaded");
   const files = await (await fetch("py/files.json" + V)).json();
   py.FS.mkdirTree("/stickman");
   await Promise.all(files.map(async (name) => {
@@ -83,9 +100,13 @@ async function start() {
   }));
   py.runPython("import sys; sys.path.insert(0, '/stickman')");
   app = py.pyimport("bridge").app;
+  performance.mark("modules imported");
+  app.set_touch(coarse);
   C = JSON.parse(app.colors());
   await makeTattoo();
+  performance.mark("tattoo drawn");
   setupScene();
+  performance.mark("scene set up");
   buildToolbar();
   setupMenu();
   setupInput();
@@ -95,7 +116,9 @@ async function start() {
     ok.addEventListener("click", (e) => { if (e.detail === 0) doAction("close_panel"); });  // keyboard
   }
   resize();
+  if (host) restorePose();
   $("loading").remove();
+  performance.mark("ready");
   window.stickman = { py, app };  // for testing from the browser console
   requestAnimationFrame(tick);
 }
@@ -355,6 +378,7 @@ function updateHud(f) {
   }
   showStatus(f.status);
   const help = $("help"), info = $("info"), top = $("toolbar").offsetHeight + 8 + "px";
+  if (coarse) help.style.maxHeight = info.style.maxHeight = `calc(100% - ${top} - 10px)`;  // they scroll here
   help.hidden = !f.help;
   help.querySelector(".title").textContent = f.help_title;
   help.querySelector(".body").textContent = f.help;
@@ -414,6 +438,7 @@ function tick(now) {
       pending = null;
       if (app.move(x, y, dx, dy)) dirty = true;
     }
+    if (pinch && pinch.moved) pinchStep();
     if (held && now >= held.next) {
       held.next = now + REPEAT_INTERVAL;
       doAction(held.action, held.shift);
@@ -437,6 +462,7 @@ function resize() {
   renderer.setPixelRatio(window.devicePixelRatio || 1);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   app.resize(window.innerWidth, window.innerHeight);
+  if (menuOpen) sizeMenuList();  // the on-screen keyboard came or went, or the phone was turned
   dirty = true;
 }
 
@@ -465,8 +491,34 @@ function bytes(proxy) {
   return data;
 }
 
+function base64(data) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(data instanceof Blob ? data : new Blob([data]));
+  });
+}
+
+let savedMessage = "";  // what the Android app's save dialog reports when it's done
+
+window.stickmanSaved = (name, ok) => say(tr(ok ? savedMessage : "Could not save {}").replace("{}", name));
+
+// The Android back button: true if it closed something on the page.
+window.stickmanBack = () => {
+  if (menuOpen) closeMenu();
+  else if (lastFrame && (lastFrame.help || lastFrame.info.length)) doAction("close_panel");
+  else return false;
+  return true;
+};
+
 // Save with the browser's save dialog where there is one, else as a download.
 async function saveFile(name, data, type, extension, description, done) {
+  if (host) {
+    savedMessage = done;
+    host.save(name, type, await base64(data));
+    return;
+  }
   if (window.showSaveFilePicker) {
     try {
       const handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description, accept: { [type]: [extension] } }] });
@@ -491,6 +543,10 @@ async function saveFile(name, data, type, extension, description, done) {
 
 // The figure as SVG (vector, which Office can turn into shapes) and PNG on the clipboard.
 function copyFigure() {
+  if (host) {  // Android's share sheet instead of the clipboard
+    capturePng().then(base64).then((png) => host.share(app.file_name() + ".png", "image/png", png));
+    return;
+  }
   if (!navigator.clipboard || !window.ClipboardItem) {
     say(tr("Copying needs a secure page (https)"));
     return;
@@ -511,41 +567,109 @@ function openPose(file) {
   });
 }
 
+// Android can close the app while it's in the background (even behind the file or share dialogs).
+function autosavePose() {
+  try {
+    const text = app.autosave();
+    if (text) localStorage.setItem(AUTOSAVE_KEY, text);
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+function restorePose() {
+  try {
+    const text = localStorage.getItem(AUTOSAVE_KEY);
+    if (text) app.restore(text);
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
 // --- toolbar -------------------------------------------------------------------
 
 const toolButtons = [];
+let tabs = [];  // on a touch screen: {button, boxes}, one per TABS entry
+
+function makeIcon(icon) {
+  const img = document.createElement("img");
+  img.alt = "";
+  if (icon === "language") {
+    img.className = "flag";  // its src is the current language's flag, set by setLanguage
+  } else {
+    img.src = `icons/${icon}.png${V}`;
+  }
+  return img;
+}
+
+function makeTool(item) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tool";
+  button.item = item;
+  button.append(makeIcon(item.icon));
+  button.addEventListener("pointerdown", (e) => pressTool(e, button));
+  button.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && !e.buttons) showTip(button); });
+  button.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hideTip(); releaseTool(button); });
+  button.addEventListener("pointerup", () => releaseTool(button));
+  button.addEventListener("pointercancel", () => releaseTool(button));
+  button.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
+  button.addEventListener("click", (e) => { if (e.detail === 0) runTool(item, false); });  // keyboard activation
+  button.addEventListener("contextmenu", (e) => e.preventDefault());
+  toolButtons.push(button);
+  return button;
+}
+
+function makeGroup(items) {
+  const box = document.createElement("div");
+  box.className = "group";
+  box.append(...items.map(makeTool));
+  return box;
+}
 
 function buildToolbar() {
   const bar = $("tools");
-  for (const group of TOOLBAR) {
-    const box = document.createElement("div");
-    box.className = "group";
-    for (const item of group) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "tool";
-      button.item = item;
-      const img = document.createElement("img");
-      img.alt = "";
-      if (item.icon === "language") {
-        img.className = "flag";  // its src is the current language's flag, set by setLanguage
-      } else {
-        img.src = `icons/${item.icon}.png${V}`;
-      }
-      button.append(img);
-      button.addEventListener("pointerdown", (e) => pressTool(e, button));
-      button.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && !e.buttons) showTip(button); });
-      button.addEventListener("pointerleave", () => { hideTip(); releaseTool(button); });
-      button.addEventListener("pointerup", () => releaseTool(button));
-      button.addEventListener("pointercancel", () => releaseTool(button));
-      button.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); });
-      button.addEventListener("click", (e) => { if (e.detail === 0) runTool(item, false); });  // keyboard activation
-      button.addEventListener("contextmenu", (e) => e.preventDefault());
-      toolButtons.push(button);
-      box.append(button);
-    }
-    bar.append(box);
-  }
+  if (coarse) buildTabs(bar);
+  else bar.append(...TOOLBAR.map(makeGroup));
+}
+
+function buildTabs(bar) {
+  const row = document.createElement("div");
+  row.className = "group tabs";
+  bar.append(row);
+  const pages = document.createElement("div");
+  pages.className = "pages";
+  bar.append(pages);
+  tabs = TABS.map((tab, i) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tool";
+    button.append(makeIcon(tab.icon));
+    button.item = { tip: tab.tip };
+    button.addEventListener("click", () => {
+      closeMenu();
+      setTab(i);
+      flashTip(button);  // after setTab: the name goes under the toolbar's rows
+    });
+    button.addEventListener("contextmenu", (e) => e.preventDefault());
+    row.append(button);
+    const items = tab.groups.flatMap((g) => TOOLBAR[g]).filter((item) => !ALWAYS_SHOWN.has(item.action));
+    const box = makeGroup(items);
+    box.hidden = true;
+    pages.append(box);
+    return { button, box };
+  });
+  row.append(...TOOLBAR.flat().filter((item) => ALWAYS_SHOWN.has(item.action)).map(makeTool));
+}
+
+// Open tab i, or close it if it's the open one: the view gets the row back.
+function setTab(i) {
+  const opening = tabs[i].box.hidden;
+  tabs.forEach(({ button, box }, k) => {
+    box.hidden = !(opening && k === i);
+    button.classList.toggle("active", !box.hidden);
+  });
+  dirty = true;  // the help and info boxes sit under the toolbar
 }
 
 function runTool(item, shift) {
@@ -561,6 +685,7 @@ function pressTool(e, button) {
   if (e.button !== 0) return;
   e.preventDefault();  // keep the keyboard focus where it was
   hideTip();
+  if (e.pointerType !== "mouse") flashTip(button);
   closeMenu();
   button.classList.add("pressed");
   const item = button.item;
@@ -574,9 +699,22 @@ function releaseTool(button) {
   if (held && held.button === button) held = null;
 }
 
+let tipTimer = 0;
+const withoutKey = (text) => text.replace(/\s*\([^()]*\)\s*$/, "");  // "Undo (Ctrl+Z)" -> "Undo"
+
+// A touch screen has no hover: pressing a button shows its name for a moment, without its shortcut.
+function flashTip(button) {
+  showTip(button);
+  const tip = $("tooltip");
+  tip.textContent = withoutKey(tip.textContent);
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(hideTip, TIP_TIME);
+}
+
 function showTip(button) {
   const tip = $("tooltip");
-  tip.textContent = tr(button.item.tip);
+  const text = host && button.item.action === "copy" ? "Share as a picture" : button.item.tip;
+  tip.textContent = tr(text);
   tip.hidden = false;
   const rect = button.getBoundingClientRect();
   tip.style.top = $("toolbar").offsetHeight + 2 + "px";
@@ -627,7 +765,7 @@ function menuLabel(f) {
     $("menu-box").style.width = `min(${menuWidth}px, calc(100vw - 12px))`;
   }
   const label = $("menu-label");
-  label.textContent = f.exercise_label || tr(MENU_PLACEHOLDER);
+  label.textContent = f.exercise_label || (coarse ? withoutKey(tr(MENU_PLACEHOLDER)) : tr(MENU_PLACEHOLDER));
   label.className = f.exercise_label ? "" : "dim";
   label.style.visibility = menuOpen ? "hidden" : "";
 }
@@ -642,11 +780,15 @@ function openMenu() {
   search.value = "";
   $("menu-label").style.visibility = "hidden";
   fillMenu(lastFrame && lastFrame.exercise);
+  $("menu-list").hidden = false;
+  sizeMenuList();
+  if (!coarse) search.focus({ preventScroll: true });  // on a touch screen, the keyboard only when asked for
+}
+
+// Down to the bottom of the window: the list sits under the toolbar's rows of buttons.
+function sizeMenuList() {
   const list = $("menu-list");
-  list.hidden = false;
-  // Down to the bottom of the window: the list sits under the toolbar's rows of buttons.
   list.style.maxHeight = `${Math.max(100, Math.min(24 * 25, window.innerHeight - list.getBoundingClientRect().top - 12))}px`;
-  search.focus({ preventScroll: true });
 }
 
 function closeMenu() {
@@ -751,22 +893,79 @@ function choose(i) {
 
 // --- mouse, touch and keys --------------------------------------------------------------
 
-let pointer = null;  // the pointer pressed on the view: {id, button, x, y}
+let pointer = null;  // the pointer pressed on the view: {id, button, x, y, kind ("drag", "orbit", "pan"), time, start}
+const fingers = new Map();  // the fingers on the view, by pointer id: {x, y}
+let pinch = null;           // two fingers zooming and panning: {distance, x, y, moved}
+
+function pinchMiddle() {
+  const [a, b] = [...fingers.values()];
+  return { distance: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+// A joint drag stays one when a second finger touches down, unless it has only just begun without
+// going anywhere: then the first finger landed on a joint by chance, and this is a pinch.
+function canPinch(e) {
+  if (!pointer || pointer.kind !== "drag") return true;
+  const moved = Math.hypot(pointer.x - pointer.start.x, pointer.y - pointer.start.y);
+  return e.timeStamp - pointer.time < PINCH_HOLD && moved < 10;  // timeStamp: when the finger landed, however busy we are
+}
+
+function startPinch() {
+  if (pointer) {
+    if (pointer.kind === "drag") app.cancel_drag();
+    else app.release(pointer.x, pointer.y, 1);  // not button 0: that could count as a click on empty space
+    pointer = null;
+  }
+  pending = null;
+  pinch = pinchMiddle();
+  app.press(pinch.x, pinch.y, 1, false, false);  // the middle button pans
+  dirty = true;
+}
+
+// Once per frame while the fingers move, as a mouse drag.
+function pinchStep() {
+  const now = pinchMiddle();
+  app.zoom(Math.log(now.distance / pinch.distance) / ZOOM_STEP);
+  app.move(now.x, now.y, now.x - pinch.x, now.y - pinch.y);
+  pinch = now;
+  dirty = true;
+}
 
 function setupInput() {
   window.addEventListener("resize", resize);
+  canvas.addEventListener("webglcontextrestored", () => { dirty = true; });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) dirty = true;
+    else if (host) autosavePose();
+  });
   canvas.addEventListener("contextmenu", (e) => e.preventDefault());
   canvas.addEventListener("pointerdown", (e) => {
-    if (pointer || e.button > 2) return;
+    const touch = e.pointerType === "touch";
+    if (touch) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 2 && !pinch && canPinch(e)) {
+      canvas.setPointerCapture(e.pointerId);
+      startPinch();
+      return;
+    }
+    if (pointer || pinch || e.button > 2) return;
     closeMenu();
     hideTip();
     canvas.setPointerCapture(e.pointerId);
-    pointer = { id: e.pointerId, button: e.button, x: e.clientX, y: e.clientY };
+    pointer = { id: e.pointerId, button: e.button, x: e.clientX, y: e.clientY,
+                time: e.timeStamp, start: { x: e.clientX, y: e.clientY } };
     pending = null;
-    app.press(e.clientX, e.clientY, e.button, e.ctrlKey || e.metaKey, e.shiftKey);
+    pointer.kind = app.press(e.clientX, e.clientY, e.button, e.ctrlKey || e.metaKey, e.shiftKey, touch);
     dirty = true;
   });
   canvas.addEventListener("pointermove", (e) => {
+    if (fingers.has(e.pointerId)) {
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pinch) {
+        pinch.moved = true;
+        return;
+      }
+    }
+    if (e.pointerType === "touch" && !pointer) return;  // no hover on a touch screen
     if (pointer && e.pointerId !== pointer.id) return;
     const last = pointer || pending || { x: e.clientX, y: e.clientY };
     pending = { x: e.clientX, y: e.clientY, dx: (pending ? pending.dx : 0) + e.clientX - last.x,
@@ -774,6 +973,15 @@ function setupInput() {
     if (pointer) pointer.x = e.clientX, pointer.y = e.clientY;
   });
   const up = (e) => {
+    const finger = fingers.delete(e.pointerId);
+    if (pinch) {
+      if (finger) {
+        app.release(e.clientX, e.clientY, 1);
+        pinch = null;
+        dirty = true;
+      }
+      return;
+    }
     if (!pointer || e.pointerId !== pointer.id) return;
     if (pending) {
       const { x, y, dx, dy } = pending;

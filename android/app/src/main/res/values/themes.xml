@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- windowBackground: the page's background colour, so starting doesn't flash another one. -->
+    <style name="Theme.Stickman" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/background</item>
+    </style>
+    <color name="background">#D6E0EB</color>
+</resources>

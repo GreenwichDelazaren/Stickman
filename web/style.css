@@ -215,3 +215,21 @@ html, body {
 @media (max-width: 600px) {
   .panel, #status { font-size: 12px; line-height: 15px; }
 }
+
+/* Phones and tablets: tabs of finger-sized buttons (buildTabs in app.js), and boxes that scroll. */
+@media (pointer: coarse) {
+  html, body { overscroll-behavior: none; }
+  #tools { flex-direction: column; gap: 4px; }
+  .pages .group[hidden] { display: none; }
+  .tool { width: min(42px, calc((100vw - 40px) / 8)); height: 42px; }
+  .tool img { width: 26px; height: 26px; }
+  .tool img.flag { width: 34px; height: 34px; }
+  #menu-box, #menu-search { height: 40px; }
+  #menu-list { top: 42px; }
+  .row { height: 40px; line-height: 40px; }
+  .panel { overflow-y: auto; pointer-events: auto; overscroll-behavior: contain; }
+  .panel pre.body { white-space: pre-wrap; }
+  .panel .ok { height: 40px; }
+  #status { white-space: normal; }
+  #tooltip { white-space: normal; max-width: calc(100vw - 12px); }
+}

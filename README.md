@@ -29,6 +29,8 @@ python -m PyInstaller --noconfirm stickman.spec
 
 The program's file dialogs start in `Documents\Stickman Poses`.
 
+There is also an Android app, made from the website: see [Android](#android).
+
 ## Controls
 
 Every action is on the toolbar at the top of the window (hover over a button
@@ -152,6 +154,47 @@ or 3D models:
 Ctrl+S, Ctrl+E and Ctrl+Shift+E open the browser's save dialog where it has
 one (Chrome, Edge) and download the file otherwise. The SVG copy needs a
 recent Chrome or Edge; other browsers copy the PNG only.
+
+On a phone or tablet the toolbar becomes a row of tabs (File, Edit, Drag,
+Joint, Figure, View) with bigger buttons under the open one; undo and redo stay
+visible. Pressing a button shows its name.
+
+| Touch | Action |
+|---|---|
+| Drag a joint | Move it |
+| Drag empty space | Orbit the camera |
+| Two fingers | Pinch to zoom, move to pan |
+| Hold a button | Repeat it |
+
+Ctrl and Shift while dragging are the three Drag buttons here. The smaller
+Shift-click steps (5°, 1 cm) aren't available by touch.
+
+## Android
+
+The `android/` folder wraps the website in an Android app. It is the same code
+as the website, with Pyodide, numpy and Three.js inside the app, so it works
+offline. Building needs the Android SDK (`ANDROID_HOME`) and a JDK 17 or newer;
+the libraries are downloaded once, into `android/cache`. With Node.js installed
+the build also precompiles numpy, which makes the app start faster.
+
+```
+python android/build.py      # -> dist/Stickman Poser.apk
+adb install -r "dist/Stickman Poser.apk"
+```
+
+That is a debug build, for trying on your own phone. For a release build,
+create a signing key and describe it in `android/keystore.properties`
+(`storeFile`, `storePassword`, `keyAlias`, `keyPassword`), then run
+`python android/build.py --release`. Keep the key and its passwords safe: an
+installed app can only be updated by a build signed with the same key.
+
+It works like the website on a phone, except:
+
+- Save and the exports open Android's save dialog.
+- The copy button shares the figure as a PNG through Android's share sheet.
+  For shapes you can edit in Office, export the `.pptx`.
+- The pose is kept when Android closes the app in the background.
+- The back button closes an open list or box, then leaves the app.
 
 ## How dragging works
 
