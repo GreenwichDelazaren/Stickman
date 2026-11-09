@@ -5,7 +5,9 @@ figure icons assume the front view, where the figure's left is screen right.
 """
 
 import functools
+import io
 import math
+import struct
 
 import pygame
 
@@ -420,3 +422,62 @@ def icon(name, size, color):
     if mirror:
         big = pygame.transform.flip(big, True, False)
     return pygame.transform.smoothscale(big, (size, size))
+
+
+# The application's own icon: a running figure in the colours of the 3D view.
+APP_SKY = (214, 224, 235, 255)
+APP_FLOOR = (243, 243, 236, 255)
+APP_NEAR = ((28, 72, 158, 255), (56, 126, 240, 255))   # (bone, joint), the figure's left
+APP_FAR = ((150, 48, 38, 255), (236, 92, 66, 255))     # the figure's right
+APP_BODY = (58, 64, 74, 255)
+APP_HEAD = (128, 138, 152, 255)
+APP_EYE = (24, 84, 226, 255)
+APP_ICON_SIZES = (16, 24, 32, 48, 64, 128, 256)
+
+
+def _app_limb(p, colors, *pts):
+    p.line(*pts, w=1.5, color=colors[0])
+    for point in pts[1:]:
+        p.dot(point, 1.15, color=colors[1])
+
+
+def app_icon(size):
+    """The application icon as a size x size SRCALPHA surface."""
+    big = pygame.Surface((size * SUPERSAMPLE,) * 2, pygame.SRCALPHA)
+    big.fill(APP_SKY[:3] + (0,))  # transparent, but smoothing the tile's edge mustn't darken it
+    p = Pen(big, APP_BODY)
+    u = p.unit
+    corner = int(3.6 * u)
+    tile = pygame.Rect(int(0.4 * u), int(0.4 * u), int(19.2 * u), int(19.2 * u))
+    pygame.draw.rect(big, APP_SKY, tile, border_radius=corner)
+    floor = pygame.Rect(tile.left, int(16.2 * u), tile.width, tile.bottom - int(16.2 * u))
+    pygame.draw.rect(big, APP_FLOOR, floor, border_bottom_left_radius=corner, border_bottom_right_radius=corner)
+
+    shoulder, pelvis = (10.7, 7.4), (9.0, 12.2)
+    _app_limb(p, APP_FAR, shoulder, (7.0, 9.0), (4.7, 11.4))
+    _app_limb(p, APP_FAR, pelvis, (6.7, 15.0), (3.1, 14.3))
+    p.line(shoulder, pelvis, w=1.9)
+    p.dot((11.9, 4.0), 2.7, color=APP_HEAD)
+    p.dot((13.3, 3.6), 0.55, color=APP_EYE)
+    _app_limb(p, APP_NEAR, pelvis, (13.0, 13.0), (12.6, 17.4))
+    _app_limb(p, APP_NEAR, shoulder, (13.6, 10.1), (16.5, 8.0))
+    return pygame.transform.smoothscale(big, (size, size))
+
+
+def app_icon_png(size):
+    """The application icon as PNG file data."""
+    out = io.BytesIO()
+    pygame.image.save(app_icon(size), out, "png")
+    return out.getvalue()
+
+
+def write_ico(path):
+    """Save the application icon as a Windows .ico (the packaged program's file icon)."""
+    images = [app_icon_png(size) for size in APP_ICON_SIZES]
+    offset = 6 + 16 * len(images)
+    entries = b""
+    for size, png in zip(APP_ICON_SIZES, images):
+        entries += struct.pack("<BBBBHHII", size % 256, size % 256, 0, 0, 1, 32, len(png), offset)
+        offset += len(png)
+    with open(path, "wb") as f:
+        f.write(struct.pack("<HHH", 0, 1, len(images)) + entries + b"".join(images))

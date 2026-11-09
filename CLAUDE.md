@@ -16,6 +16,12 @@ python web/build.py    # -> web/dist, the folder to upload; needs pygame for the
 python web/serve.py    # http://localhost:8000 (python -m http.server serves .js as text/plain on Windows)
 ```
 
+The stand-alone Windows program is built with PyInstaller (not in `requirements.txt`, it's only needed for this):
+
+```
+python -m PyInstaller --noconfirm stickman.spec    # -> "dist/Stickman Poser.exe", one file, no console
+```
+
 There is no test suite or linter config. Everything except `main.py` and `icons.py` is free of pygame/OpenGL, so pose logic and the exports can be checked headlessly:
 
 ```
@@ -37,7 +43,7 @@ A desktop app for posing a 3D stick figure (for illustrating exercises), in Gree
 - `svg.py`: the same shape dicts as an SVG image (`build_svg`), for the website's clipboard. No pygame/OpenGL.
 - `gltf.py`: meshes spheres and tubes (or takes ready-made meshes, optionally textured) and writes binary glTF (`.glb`). No pygame/OpenGL.
 - `i18n.py`: the Greek text. `tr(english)` returns the Greek from `GREEK` while `language == "el"` and the English otherwise, so anything without an entry stays English. Templates are translated before formatting (`tr("Saved {}").format(name)`). Joint/bone names are keyed by `pretty_name` output, with the side adjective in the noun's gender. `upper()` drops accents for Greek capitals; `fold()` is for accent-insensitive search. No pygame/OpenGL.
-- `icons.py`: the toolbar icons, drawn with `pygame.draw` on a 20 x 20 grid at 4x size and smoothscaled down (that's the anti-aliasing). `ICONS` maps a name to `(draw function, mirrored, rotation)`; `icon()` is cached.
+- `icons.py`: the toolbar icons, drawn with `pygame.draw` on a 20 x 20 grid at 4x size and smoothscaled down (that's the anti-aliasing). `ICONS` maps a name to `(draw function, mirrored, rotation)`; `icon()` is cached. `app_icon()` is the application's own icon, used for the window and file dialogs and, through `write_ico` in `stickman.spec`, the `.exe`.
 - `main.py`: `App` (pygame window, fixed-function OpenGL rendering, toolbar, input, undo/redo, file dialogs, clipboard copy) and `ExerciseMenu` (the drop-down list on its own row under the toolbar buttons). It keeps only what needs pygame/OpenGL and calls `scene` for the rest.
 
 ### Pose representation (skeleton.py)
@@ -80,7 +86,7 @@ A desktop app for posing a 3D stick figure (for illustrating exercises), in Gree
 - The tattoo (`scene.TATTOO_TEXT`, white) is a texture (`main.tattoo_image()`; the website draws it on a canvas) on a strip wrapped round the left forearm by `scene.tattoo_mesh()`, halfway between elbow and wrist, reading from the wrist towards the elbow. It's drawn without writing depth, so its transparent parts hide nothing. The 3D export gets it as a textured mesh (`texcoords` + PNG `image`, alpha blended) and the Office copy as a turned text box (the `text` shape, a GVML `txSp`), only when it faces the camera.
 - The info button (I, first on the toolbar) shows `scene.ABOUT`, paragraphs translated with `tr()`; the desktop wraps them to the window (`App.info_lines`), the website gets them in `frame()["info"]`. Help and info replace each other. Both boxes have a title (`scene.ABOUT_TITLE` with `scene.VERSION`, `scene.HELP_TITLE`) and an OK button that closes them (`App._panel` draws it and keeps its rect in `panel_ok` for clicks; on the website, the `close_panel` action).
 - The HUD is rendered to a pygame surface and blitted with `glDrawPixels`. It is cached on `(show_help, show_info, ok_hover, status, language, window width)`. `render(clean=True)` omits the HUD and highlights for PNG export.
-- Save/open/export use tkinter dialogs defaulting to `poses/`.
+- Save/open/export use tkinter dialogs defaulting to `poses/` (`Documents\Stickman Poses` in the packaged `.exe`, whose code runs from a temporary folder; see `default_poses_dir`).
 - Ctrl+C (`copy_to_clipboard`) puts GVML shapes plus PNG and CF_DIB fallbacks on the clipboard. `scene.figure_shapes()` projects the figure with `View.project()` and sorts far to near (painter's order), keeping each joint above the bones that end at it. Word accepts the package as one group of native shapes; it was checked by pasting through Word's COM interface (`Word.Application`, `Selection.Paste()`, `Shapes(1).GroupItems.Count`).
 - Ctrl+Shift+C puts a `.glb` on the clipboard as `model/gltf-binary`, which Word and PowerPoint paste as a 3D model (Word: inline shape type 19). Office always shows a pasted model from its front (+z), so the copy rotates the vertices by the view matrix; the `.glb` file export (Ctrl+Shift+E) stays in world coordinates. glTF colours are linear, so `build_glb` converts the sRGB display colours. A GVML package with an `am3d:model3d` frame and its own camera also works, but Word always places it at the page corner, so it isn't used.
 - Language: the code and saved files stay English (exercise names in JSON and undo states are the English names); text is translated where it's drawn or `say()`d. `T` / the `language` toolbar button toggles `i18n.language`, and the button shows `flag_el` or `flag_en` (drawn in colour at `TOOL_SIZE - 4`). The HUD, toolbar and menu caches include the language in their keys; the menu's width is computed per language. `HELP_GREEK` is the Greek help overlay.

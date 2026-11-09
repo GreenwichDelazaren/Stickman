@@ -19,6 +19,16 @@ The same app also runs as a website, with the same exercises, posing and
 files: try it at https://greenwichdelazaren.github.io/Stickman/ or see
 [Website](#website) below.
 
+To make a stand-alone Windows program that needs no Python on the other
+computer (`dist/Stickman Poser.exe`):
+
+```
+pip install pyinstaller
+python -m PyInstaller --noconfirm stickman.spec
+```
+
+The program's file dialogs start in `Documents\Stickman Poses`.
+
 ## Controls
 
 Every action is on the toolbar at the top of the window (hover over a button

@@ -7,6 +7,7 @@ import io
 import json
 import math
 import os
+import sys
 import time
 from typing import Any, cast
 
@@ -42,8 +43,19 @@ from scene import (BACKGROUND, BONE_RADIUS, FACE, FLOOR_COLOR, FLOOR_HALF, GRID_
                    SHADOW_COLOR, SIDE_COLORS, TATTOO_COLOR, TATTOO_FONT, TATTOO_PAD, TATTOO_TEXT, VIEW_ANGLES,
                    Camera, Tattoo, face_meshes, tattoo_mesh)
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-POSES_DIR = os.path.join(APP_DIR, "poses")
+
+def default_poses_dir():
+    """Where the file dialogs start: poses/ beside the code or, in the packaged .exe (whose
+    code is unpacked to a temporary folder), a folder in the user's Documents."""
+    if not getattr(sys, "frozen", False):
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "poses")
+    import ctypes
+    documents = ctypes.create_unicode_buffer(260)
+    ctypes.windll.shell32.SHGetFolderPathW(None, 5, None, 0, documents)  # 5 = CSIDL_PERSONAL
+    return os.path.join(documents.value or os.path.expanduser("~"), "Stickman Poses")
+
+
+POSES_DIR = default_poses_dir()
 
 
 def tattoo_image():
@@ -189,6 +201,8 @@ def ask_file(save, title, extension, kind):
     os.makedirs(POSES_DIR, exist_ok=True)
     root = tk.Tk()
     root.withdraw()
+    window_icon = tk.PhotoImage(master=root, data=icons.app_icon_png(48))
+    root.iconphoto(True, window_icon)
     root.attributes("-topmost", True)
     try:
         filetypes = [(tr(kind), "*" + extension), (tr("All files"), "*.*")]
@@ -418,6 +432,7 @@ class App:
     def __init__(self):
         pygame.init()
         pygame.display.set_caption("Stickman Poser")
+        pygame.display.set_icon(icons.app_icon(64))
         self._open_window((1280, 800))
         self.font = pygame.font.SysFont("consolas", 15)
         self.title_font = pygame.font.SysFont("consolas", 17, bold=True)

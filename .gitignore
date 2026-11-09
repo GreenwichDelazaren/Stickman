@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 web/dist/
+/build/
+/dist/

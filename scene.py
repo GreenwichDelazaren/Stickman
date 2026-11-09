@@ -43,7 +43,8 @@ VIEW_ANGLES = {"front": (0, 5), "side": (90, 5), "top": (0, 89), "angled": (35, 
 
 # The info button's box (I): its title and paragraphs, translated with tr() where they're shown.
 VERSION = "1.0"
-ABOUT_TITLE = "Stickman v" + VERSION
+AUTHOR = "Lazaros Filippidis"
+ABOUT_TITLE = "Stickman v" + VERSION + " · " + AUTHOR
 HELP_TITLE = "Instructions"
 ABOUT = [
     "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.",
