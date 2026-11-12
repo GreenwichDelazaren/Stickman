@@ -165,8 +165,8 @@ RANGE_OF_MOTION = {
         arm_direction(45, -140),   # behind the back
     ])),
     "elbow": ("hand", Hinge(0, 150)),
-    "hip": ("knee", Cone([(FORWARD, 125), (BACK, 20), (OUT, 45), (IN, 30)],
+    "hip": ("knee", Cone([(FORWARD, 125), (BACK, 30), (OUT, 50), (IN, 30)],
                          twist=(-45, 40), center=DOWN)),
     "knee": ("ankle", Hinge(0, 150)),
-    "ankle": ("toe", Cone([(UP, 35), (DOWN, 45), (IN, 25), (OUT, 15)])),
+    "ankle": ("toe", Cone([(UP, 40), (DOWN, 50), (IN, 25), (OUT, 15)])),
 }

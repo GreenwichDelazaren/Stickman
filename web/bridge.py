@@ -26,9 +26,11 @@ ROTATE = {"turn_left": ("yaw", 1), "turn_right": ("yaw", -1), "tip_forward": ("p
 LIFT = {"move_up": 1, "move_down": -1}
 VIEWS = {"view_front": "front", "view_side": "side", "view_top": "top", "view_angled": "angled"}
 ZOOM = {"zoom_in": 1, "zoom_out": -1}
+STEP = {"exercise_previous": -1, "exercise_next": 1}  # the buttons beside the exercise list
 
 HELP = [
     "Tab or the list under the toolbar: pick an exercise (type to search)",
+    "PgUp/PgDn or the arrows beside the list: previous / next exercise",
     "Left-drag a joint ............ move it (bone lengths stay fixed)",
     "   + Ctrl .................... move parallel to the floor",
     "   + Shift ................... move straight up / down",
@@ -54,6 +56,7 @@ HELP = [
 ]
 HELP_GREEK = [
     "Tab ή η λίστα κάτω από τη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
+    "PgUp/PgDn ή τα βέλη δίπλα στη λίστα: προηγούμενη / επόμενη άσκηση",
     "Σύρσιμο άρθρωσης ............. μετακίνηση (τα μήκη των οστών μένουν ίδια)",
     "   + Ctrl .................... παράλληλα με το δάπεδο",
     "   + Shift ................... κατακόρυφα πάνω / κάτω",
@@ -80,6 +83,7 @@ HELP_GREEK = [
 # The same on a touch screen, where there are no keys, Shift or right button.
 HELP_TOUCH = [
     "The list under the buttons: pick an exercise",
+    "The arrows beside it: previous / next exercise",
     "Drag a joint: move it (bone lengths stay fixed)",
     "Drag empty space: orbit the camera",
     "Two fingers: pinch to zoom, move to pan",
@@ -95,6 +99,7 @@ HELP_TOUCH = [
 ]
 HELP_TOUCH_GREEK = [
     "Η λίστα κάτω από τα κουμπιά: επιλογή άσκησης",
+    "Τα βέλη δίπλα της: προηγούμενη / επόμενη άσκηση",
     "Σύρσιμο άρθρωσης: μετακίνηση (τα μήκη των οστών μένουν ίδια)",
     "Σύρσιμο σε κενό σημείο: περιστροφή κάμερας",
     "Δύο δάχτυλα: τσίμπημα για ζουμ, κίνηση για μετατόπιση",
@@ -339,6 +344,8 @@ class Editor:
         elif name == "language":
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
+        elif name in STEP:
+            self.choose_exercise(scene.step_exercise(self.exercise, STEP[name]).name)
         elif name == "escape":
             self.selected = None
         elif name == "pin":

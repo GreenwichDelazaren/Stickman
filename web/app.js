@@ -44,12 +44,15 @@ const TOOLBAR = [
    { icon: "help", tip: "Show / hide the help (H)", action: "help" }],
   [{ icon: "language", tip: "Language: English. Switch to Greek (T)", action: "language" }],
 ];
+// The buttons to the right of the exercise list (main.MENU_STEPS).
+const MENU_STEPS = [{ icon: "exercise_previous", tip: "Previous exercise (Page Up)", action: "exercise_previous" },
+                    { icon: "exercise_next", tip: "Next exercise (Page Down)", action: "exercise_next" }];
 
 const KEYS = {
   KeyH: "help", KeyI: "info", KeyT: "language", Tab: "menu", Escape: "escape", KeyP: "pin", KeyM: "mirror",
   KeyZ: "twist_minus", KeyX: "twist_plus", KeyL: "limits", KeyG: "ground", KeyR: "reset",
   KeyQ: "turn_left", KeyE: "turn_right", KeyW: "tip_forward", KeyS: "tip_back", KeyA: "lean_left", KeyD: "lean_right",
-  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre",
+  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre", PageUp: "exercise_previous", PageDown: "exercise_next",
   Digit1: "view_front", Digit2: "view_side", Digit3: "view_top", Digit4: "view_angled",
   Numpad1: "view_front", Numpad2: "view_side", Numpad3: "view_top", Numpad4: "view_angled",
   Equal: "zoom_in", NumpadAdd: "zoom_in", Minus: "zoom_out", NumpadSubtract: "zoom_out",
@@ -631,6 +634,7 @@ function buildToolbar() {
   const bar = $("tools");
   if (coarse) buildTabs(bar);
   else bar.append(...TOOLBAR.map(makeGroup));
+  $("menu-row").append(...MENU_STEPS.map(makeTool));
 }
 
 function buildTabs(bar) {
@@ -762,7 +766,8 @@ function menuLabel(f) {
     const widest = Math.max(ctx.measureText(tr(MENU_PLACEHOLDER)).width,
                             ...rows.map((r) => ctx.measureText(r.label || r.heading).width));
     menuWidth = Math.ceil(widest + ctx.measureText(tr(MENU_TWO)).width + 4 * 8 + 22);
-    $("menu-box").style.width = `min(${menuWidth}px, calc(100vw - 12px))`;
+    const steps = MENU_STEPS.length;  // and room for the buttons to its right
+    $("menu-box").style.width = `min(${menuWidth}px, calc(100vw - 12px - ${steps} * (var(--tool) + 4px)))`;
   }
   const label = $("menu-label");
   label.textContent = f.exercise_label || (coarse ? withoutKey(tr(MENU_PLACEHOLDER)) : tr(MENU_PLACEHOLDER));

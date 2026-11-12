@@ -10,6 +10,7 @@
   --list: rgba(25, 30, 38, 0.94);
   --background: rgb(214, 224, 235);
   --font: Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+  --tool: 30px;  /* a toolbar button's width */
 }
 
 * { box-sizing: border-box; }
@@ -53,7 +54,7 @@ html, body {
 .group { display: flex; gap: 4px; }
 
 .tool {
-  width: 30px;
+  width: var(--tool);
   height: 30px;
   padding: 0;
   border: 0;
@@ -71,7 +72,9 @@ html, body {
 .tool.active:hover, .tool.active.pressed { background: rgb(72, 130, 222); }
 .tool:focus-visible, #menu-box:focus-visible { outline: 2px solid var(--active); outline-offset: 1px; }
 
-#menu { position: relative; display: flex; max-width: 100%; }
+#menu-row { display: flex; align-items: center; gap: 4px; max-width: 100%; }  /* the list, then MENU_STEPS */
+#menu-row .tool { flex: none; }
+#menu { position: relative; display: flex; min-width: 0; }
 
 #menu-box, #menu-search {
   height: 30px;
@@ -221,7 +224,8 @@ html, body {
   html, body { overscroll-behavior: none; }
   #tools { flex-direction: column; gap: 4px; }
   .pages .group[hidden] { display: none; }
-  .tool { width: min(42px, calc((100vw - 40px) / 8)); height: 42px; }
+  :root { --tool: min(42px, calc((100vw - 40px) / 8)); }
+  .tool { height: 42px; }
   .tool img { width: 26px; height: 26px; }
   .tool img.flag { width: 34px; height: 34px; }
   #menu-box, #menu-search { height: 40px; }

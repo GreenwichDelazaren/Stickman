@@ -43,6 +43,7 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | Input | Action |
 |---|---|
 | Tab, or click the list under the toolbar | Choose an exercise: type to search, Up/Down and Enter or click to pick, Esc to close |
+| Page Up / Page Down, or the arrows to the right of the list | Show the previous / next exercise in the list (wrapping round at the ends) |
 | Left-drag a joint | Move it parallel to the screen |
 | Ctrl + left-drag | Move it parallel to the floor |
 | Shift + left-drag | Move it straight up/down |
@@ -74,7 +75,8 @@ positions, legs and glutes, push, pull, arms and shoulders, core, cardio and
 plyometrics, running drills, stretching and yoga. Click it (or press Tab),
 type part of a name or group ("squat", "core") to narrow it down, then pick
 one. The figure takes up that position, and the camera turns to the angle that
-shows it best.
+shows it best. The two arrows to the right of the list (or Page Up / Page
+Down) step through the exercises one by one, in the order of the list.
 
 Exercises that need a start and an end position ("2 positions" in the list)
 show two figures side by side: the start on the left, the end on the right.
@@ -164,6 +166,7 @@ visible. Pressing a button shows its name.
 | Drag a joint | Move it |
 | Drag empty space | Orbit the camera |
 | Two fingers | Pinch to zoom, move to pan |
+| The arrows beside the exercise list | Previous / next exercise |
 | Hold a button | Repeat it |
 
 Ctrl and Shift while dragging are the three Drag buttons here. The smaller

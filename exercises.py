@@ -77,8 +77,8 @@ def limb(elevation, azimuth):
 
 
 def flat(out=0):
-    """Foot flat on the floor, pointing forward and turned out by degrees."""
-    return rotation_matrix(UP, math.radians(out)) @ tilt(FWD, DOWN, 21)
+    """Foot flat on the floor, heel to toes, pointing forward and turned out by degrees."""
+    return rotation_matrix(UP, math.radians(out)) @ FWD
 
 
 class Rel(tuple):
@@ -346,7 +346,7 @@ FRONT_RACK = Rel(v(0.25, -0.15, 1), v(-0.2, 0.55, -0.8))
 BACK_SQUAT_GRIP = Rel(v(1, -0.55, -0.45), v(0, 1, -0.1))
 RUN_ARM_FORWARD = (tilt(DOWN, FWD, 35), tilt(UP, FWD, 55))
 RUN_ARM_BACK = (tilt(DOWN, BACK, 40), tilt(DOWN, FWD, 50))
-FOOT_POINTED = tilt(DOWN, FWD, 30)
+FOOT_POINTED = tilt(DOWN, FWD, 40)
 
 STAND = {}
 STAND_ARMS_FORWARD = {"arms": ARMS_FORWARD}
@@ -357,9 +357,9 @@ HALF_SQUAT = {"body": tilt(UP, FWD, 25), "head": tilt(UP, FWD, 10),
 SEATED = {"legs": (v(0.1, -0.05, 1), v(0, -1, 0.05)), "feet": flat(5)}
 SIT_FLOOR = {"legs": (FWD, FWD)}
 PRONE = {"body": FWD}
-SUPINE = {"body": BACK}
+SUPINE = {"body": BACK, "legs": (tilt(FWD, DOWN, 5), tilt(FWD, DOWN, 5))}  # heels on the floor
 ARMS_ALONG_FLOOR = (v(0.15, -0.15, 1), v(0.1, -0.15, 1))  # lying on the back, hands by the hips
-KNEES_UP = (v(0, 0.75, 0.65), v(0, -0.76, 0.65))           # lying on the back, feet flat
+KNEES_UP = (v(0, 0.75, 0.65), v(0, -1.2, 0.65))           # lying on the back, feet flat
 PLANK = {"body": tilt(FWD, UP, 20), "arms": (v(0.12, -1, 0), DOWN), "level": ("l_hand", "l_toe")}
 PUSH_UP_DOWN = {"body": tilt(FWD, UP, 6), "arms": (v(0.45, 0.35, -0.8), v(-0.1, -1, 0.15)),
                 "level": ("l_hand", "l_toe")}
@@ -367,7 +367,7 @@ QUADRUPED = {"body": tilt(FWD, UP, 10), "arms": (DOWN, DOWN), "legs": (DOWN, til
              "head": tilt(FWD, DOWN, 20), "level": ("l_hand", "l_knee")}
 HANG = {"arms": (tilt(UP, OUT, 18), tilt(UP, OUT, 14)), "legs": (tilt(DOWN, FWD, 8), tilt(DOWN, FWD, 4)),
         "feet": FOOT_POINTED, "hang": 2.3, "props": [bar_overhead]}
-LUNGE = {"l_leg": (v(0, -0.05, 1), tilt(DOWN, BACK, 8)), "r_leg": (tilt(DOWN, BACK, 15), v(0, 0.35, -1)),
+LUNGE = {"l_leg": (v(0, -0.05, 1), tilt(DOWN, BACK, 8)), "r_leg": (tilt(DOWN, BACK, 15), tilt(BACK, UP, 12)),
          "l_foot": flat(), "r_foot": v(0, -1, 0.3)}
 HIP_HINGE = {"body": tilt(UP, FWD, 70), "head": tilt(UP, FWD, 45),
              "legs": (tilt(DOWN, FWD, 12), tilt(DOWN, BACK, 8)), "feet": flat(5)}
@@ -377,12 +377,12 @@ BENCH_BARBELL = [lying_bench, barbell]
 RUN = {"body": tilt(UP, FWD, 8), "l_leg": (tilt(DOWN, FWD, 45), tilt(DOWN, FWD, 5)),
        "r_leg": (tilt(DOWN, BACK, 18), tilt(UP, BACK, 60)), "l_foot": flat(),
        "r_arm": RUN_ARM_FORWARD, "l_arm": RUN_ARM_BACK}
-WALK = {"l_leg": (tilt(DOWN, FWD, 22), tilt(DOWN, FWD, 20)), "r_leg": (tilt(DOWN, BACK, 15), tilt(DOWN, BACK, 30)),
+WALK = {"l_leg": (tilt(DOWN, FWD, 22), tilt(DOWN, FWD, 20)), "r_leg": (tilt(DOWN, BACK, 15), tilt(DOWN, BACK, 49)),
         "l_foot": tilt(FWD, UP, 10), "r_foot": tilt(DOWN, FWD, 45),
         "r_arm": (tilt(DOWN, FWD, 20), tilt(DOWN, FWD, 40)), "l_arm": (tilt(DOWN, BACK, 20), tilt(DOWN, BACK, 5))}
 ON_RIGHT_SIDE = [(FWD, 90)]  # lie the standing figure down on its right side
 GUARD = (v(0.15, -1, 0.35), v(-0.3, 0.85, 0.45))  # fist by the chin
-BOXING = {"l_leg": (tilt(DOWN, FWD, 15), tilt(DOWN, FWD, 10)), "r_leg": (tilt(DOWN, BACK, 15), tilt(DOWN, BACK, 18)),
+BOXING = {"l_leg": (tilt(DOWN, FWD, 15), tilt(DOWN, FWD, 10)), "r_leg": (tilt(DOWN, BACK, 13), tilt(DOWN, BACK, 13)),
           "feet": flat(20)}
 
 STEP = block("Box", ("l_toe", "l_ankle"), 0.6, 0.45)
@@ -405,7 +405,7 @@ CATEGORIES = [
         Exercise("Sitting on the floor", [SIT_FLOOR | {"arms": (tilt(DOWN, BACK, 25), tilt(DOWN, BACK, 22))}]),
         Exercise("Kneeling", [{"legs": (DOWN, tilt(BACK, UP, 20))}]),
         Exercise("Half kneeling", [{"l_leg": (FWD, DOWN), "l_foot": flat(),
-                                    "r_leg": (tilt(DOWN, BACK, 5), tilt(BACK, UP, 20))}]),
+                                    "r_leg": (tilt(DOWN, BACK, 5), tilt(BACK, UP, 16))}]),
         Exercise("Deep squat (resting)", [{"body": tilt(UP, FWD, 40), "head": tilt(UP, FWD, 10),
                                            "legs": (v(0.35, 0.1, 1), v(0.12, -1, -0.5)), "feet": flat(20),
                                            "arms": (tilt(DOWN, FWD, 50), tilt(FWD, DOWN, 10))}]),
@@ -432,15 +432,15 @@ CATEGORIES = [
                                    "l_leg": (limb(80, 90), limb(80, 90))}]),
         Exercise("Lunge", [STAND | {"arms": HANDS_ON_HIPS}, LUNGE | {"arms": HANDS_ON_HIPS}]),
         Exercise("Split squat", [{"l_leg": (tilt(DOWN, FWD, 22), tilt(DOWN, FWD, 15)), "l_foot": flat(),
-                                  "r_leg": (tilt(DOWN, BACK, 22), tilt(DOWN, BACK, 28)), "r_foot": v(0, -1, 0.6)},
+                                  "r_leg": (tilt(DOWN, BACK, 22), tilt(DOWN, BACK, 48)), "r_foot": v(0, -1, 0.6)},
                                  LUNGE]),
         Exercise("Side lunge", [{"legs": (limb(25, 0), limb(25, 0)), "feet": flat(15), "arms": HANDS_AT_CHEST},
                                 {"body": tilt(UP, FWD, 30), "arms": HANDS_AT_CHEST,
                                  "l_leg": (v(0.6, -0.15, 0.75), v(0.1, -1, -0.4)), "l_foot": flat(25),
-                                 "r_leg": (limb(55, 0), limb(55, 0)), "r_foot": flat(5)}], FRONT),
+                                 "r_leg": (limb(49.5, 0), limb(49.5, 0)), "r_foot": flat(5)}], FRONT),
         Exercise("Curtsy lunge", [{"arms": HANDS_ON_HIPS},
                                   {"arms": HANDS_ON_HIPS, "l_leg": (v(0.05, -0.15, 1), tilt(DOWN, BACK, 8)),
-                                   "l_foot": flat(), "r_leg": (v(1, -1.6, -0.6), v(0.5, 0.35, -1)),
+                                   "l_foot": flat(), "r_leg": (v(1, -1.6, -0.6), v(0.5, -0.05, -1)),
                                    "r_foot": v(0, -1, 0.3)}], FRONT),
         Exercise("Bulgarian split squat", [
             {"l_leg": (tilt(DOWN, FWD, 15), tilt(DOWN, FWD, 6)), "l_foot": flat(),
@@ -465,7 +465,7 @@ CATEGORIES = [
                                  "arms": (OUT, OUT), "props": [shoulder_bench]}]),
         Exercise("Good morning", [{"arms": HANDS_BEHIND_HEAD}, HIP_HINGE | {"arms": HANDS_BEHIND_HEAD}]),
         Exercise("Deadlift", [{"body": tilt(UP, FWD, 65), "head": tilt(UP, FWD, 40), "arms": (DOWN, DOWN), "shrug": -15,
-                               "legs": (tilt(DOWN, FWD, 85), tilt(DOWN, BACK, 35)), "feet": flat(5),
+                               "legs": (tilt(DOWN, FWD, 85), tilt(DOWN, BACK, 33)), "feet": flat(5),
                                "props": [deadlift_barbell]},
                               {"arms": (tilt(DOWN, FWD, 3), tilt(DOWN, FWD, 3)), "props": [deadlift_barbell]}]),
         Exercise("Romanian deadlift", [{"arms": (tilt(DOWN, FWD, 3), tilt(DOWN, FWD, 3)), "props": [barbell]},
@@ -494,7 +494,8 @@ CATEGORIES = [
                                              {"arms": HANDS_ON_HIPS, "l_leg": (limb(40, 0), limb(40, 0))}], FRONT),
         Exercise("Standing hip extension", [{"arms": HANDS_ON_HIPS},
                                             {"arms": HANDS_ON_HIPS, "body": tilt(UP, FWD, 10),
-                                             "l_leg": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 30))}]),
+                                             "l_leg": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 30)),
+                                             "r_leg": (DOWN, DOWN), "r_foot": flat()}]),
     ]),
     ("Push", [
         Exercise("Push-up", [PLANK, PUSH_UP_DOWN]),
@@ -535,7 +536,7 @@ CATEGORIES = [
         Exercise("Floor press", [SUPINE | {"legs": KNEES_UP, "feet": flat(), "arms": (tilt(UP, OUT, 8), UP),
                                            "props": [barbell]},
                                  SUPINE | {"legs": KNEES_UP, "feet": flat(), "arms": (v(0.8, -0.3, 0.25), UP),
-                                           "props": [barbell]}]),
+                                           "level": ("l_elbow", "l_ankle"), "props": [barbell]}]),
         Exercise("Dumbbell fly", [BENCH | {"arms": (tilt(UP, OUT, 8), tilt(UP, OUT, 4)), "props": [lying_bench, dumbbells()]},
                                   BENCH | {"arms": (v(1, -0.15, 0), v(1, 0.15, 0)), "props": [lying_bench, dumbbells()]}],
                  ABOVE),
@@ -571,11 +572,11 @@ CATEGORIES = [
                                    HIP_HINGE | {"body": tilt(UP, FWD, 60), "arms": (v(0.2, 0.25, -1), DOWN),
                                                 "props": [barbell]}]),
         Exercise("One-arm row", [HIP_HINGE | {"body": tilt(UP, FWD, 75), "r_leg": (tilt(DOWN, FWD, 25), tilt(DOWN, BACK, 5)),
-                                              "l_leg": (tilt(DOWN, BACK, 15), tilt(DOWN, BACK, 15)),
+                                              "l_leg": (tilt(DOWN, BACK, 18), tilt(DOWN, BACK, 18)),
                                               "r_arm": (tilt(DOWN, FWD, 10), DOWN), "l_arm": (DOWN, DOWN),
                                               "props": ONE_ARM_ROW},
                                  HIP_HINGE | {"body": tilt(UP, FWD, 75), "r_leg": (tilt(DOWN, FWD, 25), tilt(DOWN, BACK, 5)),
-                                              "l_leg": (tilt(DOWN, BACK, 15), tilt(DOWN, BACK, 15)),
+                                              "l_leg": (tilt(DOWN, BACK, 18), tilt(DOWN, BACK, 18)),
                                               "r_arm": (tilt(DOWN, FWD, 10), DOWN),
                                               "l_arm": (v(0.15, 0.3, -1), DOWN), "props": ONE_ARM_ROW}]),
         Exercise("Lat pulldown", [SEATED | {"body": tilt(UP, BACK, 10), "arms": (limb(165, 20), limb(170, 10)),
@@ -616,7 +617,7 @@ CATEGORIES = [
     ("Core", [
         Exercise("Plank", [PLANK]),
         Exercise("Forearm plank", [{"body": tilt(FWD, UP, 10), "arms": (DOWN, v(-0.15, 0, 1)),
-                                    "level": ("l_elbow", "l_toe")}]),
+                                    "level": ("l_hand", "l_toe")}]),
         Exercise("Side plank", [{"r_arm": (OUT, FWD), "l_arm": HANDS_ON_HIPS, "rotate": ON_RIGHT_SIDE,
                                  "level": ("r_elbow", "r_ankle")}], FRONT),
         Exercise("Side plank, arm raised", [{"r_arm": (OUT, OUT), "l_arm": (OUT, OUT), "rotate": ON_RIGHT_SIDE,
@@ -693,10 +694,10 @@ CATEGORIES = [
                                 mirrored({"l_leg": (tilt(DOWN, BACK, 5), tilt(UP, BACK, 25)), "l_foot": BACK,
                                           "r_arm": RUN_ARM_FORWARD, "l_arm": RUN_ARM_BACK})]),
         Exercise("Skater jump", [{"body": tilt(UP, FWD, 30), "r_leg": (tilt(DOWN, FWD, 45), tilt(DOWN, BACK, 20)),
-                                  "r_foot": flat(), "l_leg": (v(-0.45, -1, -0.5), v(-0.3, -1, -0.5)),
+                                  "r_foot": flat(), "l_leg": (v(-0.45, -1, -0.5), v(-0.3, -0.4, -0.5)),
                                   "l_arm": (v(-0.5, -0.6, 0.6), v(-0.5, -0.4, 0.7)), "r_arm": (tilt(DOWN, BACK, 35), tilt(DOWN, BACK, 30))},
                                  mirrored({"body": tilt(UP, FWD, 30), "r_leg": (tilt(DOWN, FWD, 45), tilt(DOWN, BACK, 20)),
-                                           "r_foot": flat(), "l_leg": (v(-0.45, -1, -0.5), v(-0.3, -1, -0.5)),
+                                           "r_foot": flat(), "l_leg": (v(-0.45, -1, -0.5), v(-0.3, -0.4, -0.5)),
                                            "l_arm": (v(-0.5, -0.6, 0.6), v(-0.5, -0.4, 0.7)),
                                            "r_arm": (tilt(DOWN, BACK, 35), tilt(DOWN, BACK, 30))})], FRONT),
         Exercise("Box jump", [SQUAT | {"arms": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 25)),
@@ -712,8 +713,8 @@ CATEGORIES = [
     ("Running drills", [
         Exercise("Running stride", [RUN, mirrored(RUN)]),
         Exercise("Sprint start", [
-            {"body": tilt(FWD, DOWN, 15), "arms": (DOWN, DOWN), "head": tilt(DOWN, FWD, 30),
-             "l_leg": (tilt(DOWN, FWD, 55), tilt(DOWN, BACK, 35)), "r_leg": (tilt(DOWN, FWD, 15), tilt(DOWN, BACK, 45)),
+            {"body": tilt(FWD, DOWN, 30), "arms": (DOWN, DOWN), "head": tilt(DOWN, FWD, 30),
+             "l_leg": (tilt(DOWN, FWD, 55), tilt(DOWN, BACK, 35)), "r_leg": (tilt(DOWN, FWD, 10), tilt(DOWN, BACK, 20)),
              "level": ("l_hand", "l_toe")},
             {"body": tilt(UP, FWD, 50), "head": tilt(UP, FWD, 35),
              "l_leg": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 35)), "l_foot": tilt(DOWN, BACK, 10),
@@ -739,15 +740,16 @@ CATEGORIES = [
         Exercise("Standing quad stretch", [{"l_leg": (tilt(DOWN, BACK, 8), tilt(UP, BACK, 15)), "l_foot": BACK,
                                             "l_arm": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 30)), "r_arm": (OUT, OUT)}]),
         Exercise("Standing hamstring stretch", [{"body": tilt(UP, FWD, 110), "chest": tilt(UP, FWD, 135),
-                                                 "neck": tilt(UP, FWD, 155), "arms": (DOWN, DOWN), "legs": (DOWN, DOWN)}]),
+                                                 "neck": tilt(UP, FWD, 155), "arms": (DOWN, tilt(DOWN, BACK, 33)), "legs": (DOWN, DOWN),
+                                                 "feet": flat()}]),
         Exercise("Seated forward fold", [SIT_FLOOR | {"body": tilt(UP, FWD, 30), "chest": tilt(UP, FWD, 70),
                                                       "neck": tilt(UP, FWD, 100), "arms": (tilt(FWD, DOWN, 15), FWD)}]),
         Exercise("Butterfly stretch", [{"body": tilt(UP, FWD, 15), "legs": (v(0.8, -0.05, 0.6), v(-0.75, -0.25, 0.3)),
                                         "arms": (tilt(DOWN, FWD, 30), tilt(FWD, DOWN, 30))}], FRONT),
-        Exercise("Hip flexor stretch", [{"l_leg": (FWD, tilt(DOWN, BACK, 30)), "l_foot": flat(),
+        Exercise("Hip flexor stretch", [{"l_leg": (FWD, tilt(DOWN, BACK, 28)), "l_foot": flat(),
                                          "r_leg": (tilt(DOWN, BACK, 20), tilt(BACK, UP, 20)), "arms": ARMS_UP}]),
         Exercise("Calf stretch", [{"body": tilt(UP, FWD, 25), "arms": (tilt(FWD, UP, 25), tilt(FWD, UP, 25)),
-                                   "l_leg": (tilt(DOWN, FWD, 20), tilt(DOWN, BACK, 15)), "l_foot": flat(),
+                                   "l_leg": (tilt(DOWN, FWD, 40), tilt(DOWN, BACK, 15)), "l_foot": flat(),
                                    "r_leg": (tilt(DOWN, BACK, 30), tilt(DOWN, BACK, 30)), "r_foot": flat(),
                                    "props": [wall(HANDS, 1)]}]),
         Exercise("Side bend stretch", [{"chest": tilt(UP, IN, 20), "neck": tilt(UP, IN, 35),
@@ -764,10 +766,11 @@ CATEGORIES = [
         Exercise("Lying spinal twist", [{"body": BACK, "front": v(-1, 0.35, 0), "twist": 40, "arms": (OUT, OUT),
                                          "legs": Rel(limb(90, 90), tilt(DOWN, BACK, 10))}], ABOVE),
         Exercise("Child's pose", [{"body": tilt(FWD, UP, 15), "chest": tilt(FWD, DOWN, 25), "neck": tilt(FWD, DOWN, 40),
-                                   "head": tilt(DOWN, FWD, 30), "legs": (v(0, -0.55, 0.8), tilt(BACK, UP, 10)),
-                                   "arms": (tilt(FWD, DOWN, 20), FWD)}]),
+                                   "head": tilt(DOWN, FWD, 30), "legs": (v(0, -0.55, 0.8), BACK),
+                                   "arms": (tilt(FWD, DOWN, 20), FWD), "level": ("l_hand", "l_knee")}]),
         Exercise("Cobra", [{"body": FWD, "chest": tilt(FWD, UP, 25), "neck": tilt(FWD, UP, 40), "head": tilt(UP, FWD, 35),
-                            "arms": (tilt(DOWN, BACK, 55), tilt(DOWN, FWD, 30)), "feet": BACK}]),
+                            "arms": (tilt(DOWN, BACK, 55), tilt(DOWN, FWD, 30)), "feet": BACK,
+                            "level": ("l_hand", "l_toe")}]),
         Exercise("Cat-cow", [QUADRUPED | {"body": tilt(FWD, UP, 25), "chest": tilt(FWD, UP, 15),
                                           "neck": tilt(FWD, DOWN, 20), "head": tilt(DOWN, FWD, 15)},
                              QUADRUPED | {"body": tilt(FWD, DOWN, 5), "chest": tilt(FWD, DOWN, 8),
@@ -787,27 +790,29 @@ CATEGORIES = [
         Exercise("Plank pose", [PLANK]),
         Exercise("Chair pose", [{"body": tilt(UP, FWD, 30), "legs": (tilt(FWD, DOWN, 40), tilt(DOWN, BACK, 25)),
                                  "feet": flat(), "arms": (tilt(UP, FWD, 30), tilt(UP, FWD, 30))}]),
-        Exercise("Warrior I", [{"l_leg": (v(0, -0.1, 1), DOWN), "l_foot": flat(),
-                                "r_leg": (tilt(DOWN, BACK, 38), tilt(DOWN, BACK, 38)), "r_foot": flat(45),
+        # The pelvis opens towards the back leg and the shoulders turn to the front.
+        Exercise("Warrior I", [{"front": v(-1, 0, 1), "twist": 40, "body": tilt(UP, FWD, 10), "chest": UP, "neck": UP,
+                                "l_leg": (tilt(FWD, DOWN, 10), DOWN), "l_foot": flat(),
+                                "r_leg": (tilt(DOWN, BACK, 49.4), tilt(DOWN, BACK, 49.4)), "r_foot": flat(45),
                                 "arms": (tilt(UP, OUT, 8), UP)}]),
-        Exercise("Warrior II", [{"front": v(-1, 0, 1), "twist": 40, "look": 40,
-                                 "l_leg": (v(1, -0.1, 0.1), DOWN), "l_foot": flat(85),
-                                 "r_leg": (limb(40, 10), limb(40, 10)), "r_foot": flat(10),
+        Exercise("Warrior II", [{"look": 70,
+                                 "l_leg": (v(1, -0.15, 0.3), DOWN), "l_foot": flat(80),
+                                 "r_leg": (limb(54, 10), limb(54, 10)), "r_foot": flat(25),
                                  "l_arm": (OUT, OUT), "r_arm": (OUT, OUT)}], FRONT),
         Exercise("Warrior III", [{"body": tilt(UP, FWD, 88), "head": tilt(UP, FWD, 85), "arms": (FWD, FWD),
                                   "l_leg": (BACK, BACK), "r_leg": (DOWN, DOWN), "r_foot": flat()}]),
         Exercise("Tree pose", [{"l_leg": (v(0.75, -0.65, 0.25), v(-1, 0.05, 0)),
                                 "arms": (v(0.4, 0.9, 0.1), v(-0.35, 0.95, 0))}], FRONT),
         # The pelvis turns towards the front leg and tips over it; the shoulders turn back.
-        Exercise("Triangle pose", [{"body": tilt(UP, OUT, 50), "front": v(1, 0, 1), "twist": -40,
-                                    "l_leg": (limb(30, 0), limb(30, 0)), "r_leg": (limb(30, 0), limb(30, 0)),
-                                    "l_foot": flat(80), "r_foot": flat(15), "l_arm": (DOWN, DOWN), "r_arm": (UP, UP)}],
+        Exercise("Triangle pose", [{"body": tilt(UP, OUT, 35), "front": v(1, 0, 1), "twist": -40,
+                                    "l_leg": (limb(40, 0), limb(40, 0)), "r_leg": (limb(30, 0), limb(30, 0)),
+                                    "l_foot": flat(60), "r_foot": flat(-30), "l_arm": (DOWN, DOWN), "r_arm": (UP, UP)}],
                  FRONT),
         Exercise("Bridge pose", [{"body": v(0, -0.45, -1), "neck": v(0, -0.1, -1), "head": BACK,
                                   "legs": (v(0, 0.25, 1), v(0, -1, 0.1)), "feet": flat(), "arms": ARMS_ALONG_FLOOR}]),
         Exercise("Happy baby", [SUPINE | {"legs": (v(0.5, 0.75, -0.45), v(0.1, 1, 0)),
                                           "arms": (v(0.25, 0.8, 0.45), v(0.1, 1, 0))}]),
         Exercise("Corpse pose", [SUPINE | {"arms": (v(0.5, -0.1, 1), v(0.45, -0.1, 1)),
-                                           "legs": (v(0.12, 0, 1), v(0.1, 0, 1))}], ABOVE),
+                                           "legs": (v(0.12, -0.08, 1), v(0.1, -0.08, 1))}], ABOVE),
     ]),
 ]

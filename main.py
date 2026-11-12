@@ -71,6 +71,7 @@ def tattoo_image():
 
 HELP = [
     "Tab or the list under the toolbar: pick an exercise (type to search)",
+    "PgUp/PgDn or the arrows beside the list: previous / next exercise",
     "Left-drag a joint ............ move it (bone lengths stay fixed)",
     "   + Ctrl .................... move parallel to the floor",
     "   + Shift ................... move straight up / down",
@@ -95,6 +96,7 @@ HELP = [
 ]
 HELP_GREEK = [
     "Tab ή η λίστα κάτω από τη γραμμή εργαλείων: επιλογή άσκησης (γράψτε για αναζήτηση)",
+    "PgUp/PgDn ή τα βέλη δίπλα στη λίστα: προηγούμενη / επόμενη άσκηση",
     "Σύρσιμο άρθρωσης ............. μετακίνηση (τα μήκη των οστών μένουν ίδια)",
     "   + Ctrl .................... παράλληλα με το δάπεδο",
     "   + Shift ................... κατακόρυφα πάνω / κάτω",
@@ -176,6 +178,10 @@ TOOLBAR = [
      ("help", "Show / hide the help (H)", (pygame.K_h, 0))],
     [("language", "Language: English. Switch to Greek (T)", (pygame.K_t, 0))],
 ]
+# The buttons to the right of the exercise list, as TOOLBAR items.
+MENU_STEPS = [("exercise_previous", "Previous exercise (Page Up)", (pygame.K_PAGEUP, 0)),
+              ("exercise_next", "Next exercise (Page Down)", (pygame.K_PAGEDOWN, 0))]
+STEP_KEYS = {pygame.K_PAGEUP: -1, pygame.K_PAGEDOWN: 1}
 TOOL_COLORS = {"bar": (25, 30, 38, 175), "button": (62, 70, 84, 255), "hover": (88, 99, 116, 255),
                "active": (46, 104, 196, 255), "icon": (235, 238, 242)}
 TOOL_SIZE, TOOL_ICON, TOOL_GAP, TOOL_GROUP_GAP, TOOL_MARGIN = 30, 20, 4, 14, 6
@@ -727,6 +733,8 @@ class App:
         elif key == pygame.K_TAB:
             self.held = None
             self.menu.open(self.exercise)
+        elif key in STEP_KEYS:
+            self.choose_exercise(scene.step_exercise(self.exercise, STEP_KEYS[key]))
         elif key == pygame.K_ESCAPE:
             self.selected = None
         elif key == pygame.K_p:
@@ -785,7 +793,8 @@ class App:
     def toolbar(self):
         """[(rect, (icon, tooltip, action))] for the current window width, the
         exercise list's rect and the toolbar height.  Groups wrap onto a new row
-        when they don't fit; the list has a row of its own under the buttons."""
+        when they don't fit; the list has a row of its own under the buttons,
+        with the MENU_STEPS buttons to its right."""
         width = self.size[0]
         if self._tools[0] != (width, i18n.language):  # the list's width depends on the language
             items, x, y = [], TOOL_MARGIN, TOOL_MARGIN
@@ -797,7 +806,13 @@ class App:
                     x += TOOL_SIZE + TOOL_GAP
                 x += TOOL_GROUP_GAP - TOOL_GAP
             y += TOOL_SIZE + TOOL_GAP
-            menu = pygame.Rect(TOOL_MARGIN, y, max(1, min(self.menu.width, width - 2 * TOOL_MARGIN)), TOOL_SIZE)
+            steps = len(MENU_STEPS) * (TOOL_SIZE + TOOL_GAP)
+            menu = pygame.Rect(TOOL_MARGIN, y, max(1, min(self.menu.width, width - 2 * TOOL_MARGIN - steps)),
+                               TOOL_SIZE)
+            x = menu.right + TOOL_GAP
+            for item in MENU_STEPS:
+                items.append((pygame.Rect(x, y, TOOL_SIZE, TOOL_SIZE), item))
+                x += TOOL_SIZE + TOOL_GAP
             self._tools = ((width, i18n.language), items, menu, menu.bottom + TOOL_MARGIN)
         return self._tools[1:]
 

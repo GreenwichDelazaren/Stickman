@@ -30,14 +30,15 @@ _CENTER = [
     ("head", "neck", (0.00, 1.62, 0.01)),
 ]
 # Elbows and knees start slightly bent: this sets the direction they bend in.
+# The foot lies flat on the floor, the ankle joint doubling as the heel.
 _LEFT = [
     ("l_shoulder", "neck", (0.19, 1.44, 0.00)),
     ("l_elbow", "l_shoulder", (0.22, 1.16, -0.04)),
     ("l_hand", "l_elbow", (0.24, 0.91, 0.03)),
     ("l_hip", "pelvis", (0.10, 0.92, 0.00)),
-    ("l_knee", "l_hip", (0.11, 0.51, 0.04)),
-    ("l_ankle", "l_knee", (0.12, 0.09, 0.00)),
-    ("l_toe", "l_ankle", (0.12, JOINT_RADIUS, 0.15)),
+    ("l_knee", "l_hip", (0.11, 0.49, 0.04)),
+    ("l_ankle", "l_knee", (0.12, JOINT_RADIUS, 0.00)),
+    ("l_toe", "l_ankle", (0.12, JOINT_RADIUS, 0.16)),
 ]
 _RIGHT = [
     ("r" + name[1:], parent if parent in ("neck", "pelvis") else "r" + parent[1:], (-x, y, z))

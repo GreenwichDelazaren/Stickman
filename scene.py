@@ -267,6 +267,16 @@ def find_exercise(name):
     return next((e for _, items in ex.CATEGORIES for e in items if e.name == name), None)
 
 
+def step_exercise(name, step):
+    """The exercise step places after the one called name in the list (before it for a negative step),
+    wrapping round at the ends; without a current exercise, the first (step > 0) or the last."""
+    exercises = [e for _, items in ex.CATEGORIES for e in items]
+    names = [e.name for e in exercises]
+    if name not in names:
+        return exercises[0 if step > 0 else -1]
+    return exercises[(names.index(name) + step) % len(exercises)]
+
+
 def search_exercises(query):
     """[(category, exercise)] of the exercises matching query (in English or the other language, accents
     optional), with (category, None) as the heading of each category."""

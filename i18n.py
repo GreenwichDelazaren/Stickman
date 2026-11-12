@@ -124,6 +124,8 @@ _UI = {
     "2 positions": "2 θέσεις",
     "Type to search...": "Πληκτρολογήστε για αναζήτηση...",
     "No exercise matches": "Δεν βρέθηκε άσκηση",
+    "Previous exercise (Page Up)": "Προηγούμενη άσκηση (Page Up)",
+    "Next exercise (Page Down)": "Επόμενη άσκηση (Page Down)",
     # messages and status line
     "Language: English": "Γλώσσα: Ελληνικά",
     "{}: start position on the left, end position on the right": "{}: αρχική θέση αριστερά, τελική θέση δεξιά",

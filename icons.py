@@ -307,6 +307,11 @@ def _zoom(sign):
     return draw
 
 
+def _chevron(p):
+    """Pointing right: the next exercise (mirrored, the previous one)."""
+    p.line((7, 3.5), (13.5, 10), (7, 16.5), w=2.4)
+
+
 def _help(p):
     pts = arc_points((10, 7), 4, 4, 165, -55)
     p.line(*pts, (10, 12), (10, 13.2), w=2.2)
@@ -408,6 +413,8 @@ ICONS = {
     "zoom_out": (_zoom(-1), False, 0),
     "help": (_help, False, 0),
     "info": (_info, False, 0),
+    "exercise_previous": (_chevron, True, 0),
+    "exercise_next": (_chevron, False, 0),
     "flag_el": (_flag_greece, False, 0),
     "flag_en": (_flag_uk, False, 0),
 }
