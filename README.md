@@ -59,6 +59,7 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | G | Put the figure on the floor |
 | R | Reset to a single figure in the standing pose |
 | 1 2 3 4 / F | Front, side, top, angled view / centre on figure |
+| B | Show / hide the floor, its grid and the shadows (the grid button) |
 | Ctrl+Z, Ctrl+Y | Undo, redo |
 | Ctrl+S, Ctrl+O | Save / open a pose (JSON, in `poses/` by default) |
 | Ctrl+E or F12 | Export a PNG without the help overlay or highlights |

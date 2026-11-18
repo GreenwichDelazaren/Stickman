@@ -41,6 +41,7 @@ const TOOLBAR = [
    { icon: "centre", tip: "Centre the view on the figure (F)", action: "centre" },
    { icon: "zoom_in", tip: "Zoom in (+ or mouse wheel)", action: "zoom_in" },
    { icon: "zoom_out", tip: "Zoom out (- or mouse wheel)", action: "zoom_out" },
+   { icon: "floor_grid", tip: "Show / hide the floor and grid (B)", action: "floor_grid" },
    { icon: "help", tip: "Show / hide the help (H)", action: "help" }],
   [{ icon: "language", tip: "Language: English. Switch to Greek (T)", action: "language" }],
 ];
@@ -52,7 +53,7 @@ const KEYS = {
   KeyH: "help", KeyI: "info", KeyT: "language", Tab: "menu", Escape: "escape", KeyP: "pin", KeyM: "mirror",
   KeyZ: "twist_minus", KeyX: "twist_plus", KeyL: "limits", KeyG: "ground", KeyR: "reset",
   KeyQ: "turn_left", KeyE: "turn_right", KeyW: "tip_forward", KeyS: "tip_back", KeyA: "lean_left", KeyD: "lean_right",
-  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre", PageUp: "exercise_previous", PageDown: "exercise_next",
+  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre", KeyB: "floor_grid", PageUp: "exercise_previous", PageDown: "exercise_next",
   Digit1: "view_front", Digit2: "view_side", Digit3: "view_top", Digit4: "view_angled",
   Numpad1: "view_front", Numpad2: "view_side", Numpad3: "view_top", Numpad4: "view_angled",
   Equal: "zoom_in", NumpadAdd: "zoom_in", Minus: "zoom_out", NumpadSubtract: "zoom_out",
@@ -135,7 +136,7 @@ start().catch((error) => {
 
 // --- drawing ---------------------------------------------------------------------
 
-let renderer, scene, camera, floor, figureGroup, shadowGroup, propGroup, propShadowGroup, tattooTexture;
+let renderer, scene, camera, floor, grid, figureGroup, shadowGroup, propGroup, propShadowGroup, tattooTexture;
 const materials = new Map();
 const geometries = {};
 let dirty = true;             // draw a new frame
@@ -190,7 +191,7 @@ function setupScene() {
     const v = i * C.grid_step;
     lines.push(v, 0, -half, v, 0, half, -half, 0, v, half, 0, v);
   }
-  const grid = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(lines, 3)),
+  grid = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute("position", new THREE.Float32BufferAttribute(lines, 3)),
                                       new THREE.LineBasicMaterial({ color: color(C.grid) }));
   grid.renderOrder = 1;
   scene.add(grid);
@@ -326,8 +327,9 @@ function applyFrame(f) {
   camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   camera.matrixWorldInverse.fromArray(f.view);
   camera.matrixWorld.copy(camera.matrixWorldInverse).invert();
-  const above = f.eye[1] > 0;  // the floor and shadows only from above
+  const above = f.eye[1] > 0 && f.active.floor_grid;  // the floor and shadows only from above, when shown
   floor.visible = shadowGroup.visible = propShadowGroup.visible = above;
+  grid.visible = f.active.floor_grid;
   drawFigures(f.figures);
   if (f.props) drawProps(f.props);
 }

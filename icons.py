@@ -208,6 +208,17 @@ def _drag_floor(p):
     p.arrow((8.3, 15.6), (11.7, 7.4), both=True, **small)
 
 
+def _floor_grid(p):
+    """A floor grid seen in perspective: a trapezoid with 3 x 3 cells."""
+    back, front = (5.5, 14.5, 4.5), (0.5, 19.5, 16.5)  # (left x, right x, y) of the far and near edges
+    for i in range(4):
+        t = i / 3
+        p.line((back[0] + t * (back[1] - back[0]), back[2]), (front[0] + t * (front[1] - front[0]), front[2]), w=1.3)
+        y = back[2] + (front[2] - back[2]) * t ** 1.3  # rows closer together further away
+        x0 = back[0] + (front[0] - back[0]) * (y - back[2]) / (front[2] - back[2])
+        p.line((x0, y), (20 - x0, y), w=1.3)
+
+
 def _drag_vertical(p):
     p.line((1, 18.5), (4, 14.5), (19, 14.5), (16, 18.5), closed=True, w=1.3)
     p.arrow((10, 1.5), (10, 12.5), both=True, length=3.8, width=6)
@@ -411,6 +422,7 @@ ICONS = {
     "centre": (_centre, False, 0),
     "zoom_in": (_zoom(1), False, 0),
     "zoom_out": (_zoom(-1), False, 0),
+    "floor_grid": (_floor_grid, False, 0),
     "help": (_help, False, 0),
     "info": (_info, False, 0),
     "exercise_previous": (_chevron, True, 0),

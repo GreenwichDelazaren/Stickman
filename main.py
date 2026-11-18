@@ -85,6 +85,7 @@ HELP = [
     "Up/Down arrow  raise / lower the figure (Shift: 1 cm steps)",
     "G  put figure on the floor     R  reset to one standing figure",
     "1 front  2 side  3 top  4 angled  F centre view  +/- zoom",
+    "B  show / hide the floor and grid",
     "Ctrl+Z/Y undo/redo  Ctrl+S save  Ctrl+O open  Ctrl+E export PNG",
     "Ctrl+C copy as editable shapes  Ctrl+Shift+C copy as 3D model",
     "Ctrl+Shift+E export 3D model (.glb)",
@@ -110,6 +111,7 @@ HELP_GREEK = [
     "Πάνω/Κάτω βέλος  ανύψωση / χαμήλωμα της φιγούρας (Shift: ανά 1 cm)",
     "G  φιγούρα στο δάπεδο          R  επαναφορά σε μία όρθια φιγούρα",
     "1 πρόσοψη  2 πλάγια  3 κάτοψη  4 υπό γωνία  F κεντράρισμα  +/- ζουμ",
+    "B  εμφάνιση / απόκρυψη δαπέδου και πλέγματος",
     "Ctrl+Z/Y αναίρεση/επανάληψη  Ctrl+S αποθήκευση  Ctrl+O άνοιγμα  Ctrl+E εξαγωγή PNG",
     "Ctrl+C αντιγραφή ως επεξεργάσιμα σχήματα  Ctrl+Shift+C ως τρισδιάστατο μοντέλο",
     "Ctrl+Shift+E εξαγωγή τρισδιάστατου μοντέλου (.glb)",
@@ -175,6 +177,7 @@ TOOLBAR = [
      ("centre", "Centre the view on the figure (F)", (pygame.K_f, 0)),
      ("zoom_in", "Zoom in (+ or mouse wheel)", (pygame.K_EQUALS, 0)),
      ("zoom_out", "Zoom out (- or mouse wheel)", (pygame.K_MINUS, 0)),
+     ("floor_grid", "Show / hide the floor and grid (B)", (pygame.K_b, 0)),
      ("help", "Show / hide the help (H)", (pygame.K_h, 0))],
     [("language", "Language: English. Switch to Greek (T)", (pygame.K_t, 0))],
 ]
@@ -465,6 +468,7 @@ class App:
         self.press_pos = (0, 0)
         self.undo_stack, self.redo_stack = [], []
         self.show_help = False
+        self.show_floor = True
         self.show_info = False         # the info text (scene.ABOUT)
         self.panel_ok = self._panel_ok = None  # the help or info box's OK button: in the window, in the box
         self.ok_hover = False
@@ -780,6 +784,8 @@ class App:
             self.say(tr("Pose reset (Ctrl+Z to undo)"))
         elif key in VIEWS:
             self.camera.yaw, self.camera.pitch = VIEWS[key]
+        elif key == pygame.K_b:
+            self.show_floor = not self.show_floor
         elif key == pygame.K_f:
             lo, hi = self.figures_bounds()
             self.camera.target = (lo + hi) / 2
@@ -840,6 +846,7 @@ class App:
         if isinstance(action, str):
             return self.drag_mode == action
         return {(pygame.K_l, 0): self.skel.limits_on, (pygame.K_h, 0): self.show_help, (pygame.K_i, 0): self.show_info,
+                (pygame.K_b, 0): self.show_floor,
                 (pygame.K_p, 0): self.selected in self.skel.pins}.get(action, False)
 
     def draw_toolbar(self):
@@ -974,8 +981,9 @@ class App:
         glLightfv(GL_LIGHT0, GL_POSITION, (*LIGHT_DIR, 0.0))
 
         above = self.camera.eye()[1] > 0
-        self.draw_floor(solid=above)
-        if above:
+        if self.show_floor:
+            self.draw_floor(solid=above)
+        if above and self.show_floor:
             glPushMatrix()
             glScalef(1.0, 0.0, 1.0)  # flatten onto the floor
             glColor3f(*SHADOW_COLOR)

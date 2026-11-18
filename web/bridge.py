@@ -44,6 +44,7 @@ HELP = [
     "Up/Down arrow  raise / lower the figure (Shift: 1 cm steps)",
     "G  put figure on the floor     R  reset to one standing figure",
     "1 front  2 side  3 top  4 angled  F centre view  +/- zoom",
+    "B  show / hide the floor and grid",
     "Ctrl+Z/Y undo/redo  Ctrl+S save  Ctrl+O open  Ctrl+E export PNG",
     "Ctrl+C copy as a picture (Office: right-click > Convert to Shape)",
     "Ctrl+Shift+S download editable shapes (.pptx)",
@@ -70,6 +71,7 @@ HELP_GREEK = [
     "Πάνω/Κάτω βέλος  ανύψωση / χαμήλωμα της φιγούρας (Shift: ανά 1 cm)",
     "G  φιγούρα στο δάπεδο          R  επαναφορά σε μία όρθια φιγούρα",
     "1 πρόσοψη  2 πλάγια  3 κάτοψη  4 υπό γωνία  F κεντράρισμα  +/- ζουμ",
+    "B  εμφάνιση / απόκρυψη δαπέδου και πλέγματος",
     "Ctrl+Z/Y αναίρεση/επανάληψη  Ctrl+S αποθήκευση  Ctrl+O άνοιγμα  Ctrl+E εξαγωγή PNG",
     "Ctrl+C αντιγραφή ως εικόνα (Office: δεξί κλικ > Μετατροπή σε σχήμα)",
     "Ctrl+Shift+S λήψη ως επεξεργάσιμα σχήματα (.pptx)",
@@ -93,7 +95,7 @@ HELP_TOUCH = [
     "Drag: move joints along the screen, the floor, or up / down",
     "Joint (tap a joint first): pin, mirror, twist",
     "Figure: raise, lower, turn, tip, lean",
-    "View: front, side, top, angled, centre, zoom, this help",
+    "View: front, side, top, angled, centre, zoom, floor, this help",
     "Hold a button to repeat it",
     "Colours: blue = left, red = right, green = pinned",
 ]
@@ -109,7 +111,7 @@ HELP_TOUCH_GREEK = [
     "Σύρσιμο: μετακίνηση αρθρώσεων στην οθόνη, στο δάπεδο ή πάνω / κάτω",
     "Άρθρωση (πατήστε πρώτα μια άρθρωση): καρφίτσωμα, αντιγραφή πλευράς, περιστροφή",
     "Φιγούρα: ανύψωση, χαμήλωμα, στροφή, κλίση",
-    "Προβολή: πρόσοψη, πλάγια, κάτοψη, υπό γωνία, κεντράρισμα, ζουμ, αυτή η βοήθεια",
+    "Προβολή: πρόσοψη, πλάγια, κάτοψη, υπό γωνία, κεντράρισμα, ζουμ, δάπεδο, αυτή η βοήθεια",
     "Κρατήστε πατημένο ένα κουμπί για επανάληψη",
     "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
 ]
@@ -142,6 +144,7 @@ class Editor:
         self.undo_stack, self.redo_stack = [], []
         self.show_help = False
         self.show_info = False         # the info text (scene.ABOUT)
+        self.show_floor = True         # the floor, its grid and the shadows
         self.drag_mode = "screen"       # used when no modifier is held
         self.message = ""               # for app.js to show, taken by frame()
         self.tattoo = scene.Tattoo(1, 1, b"")
@@ -391,6 +394,8 @@ class Editor:
             self.hint("Pose reset (Ctrl+Z to undo)")
         elif name in VIEWS:
             self.camera.yaw, self.camera.pitch = scene.VIEW_ANGLES[VIEWS[name]]
+        elif name == "floor_grid":
+            self.show_floor = not self.show_floor
         elif name == "centre":
             lo, hi = scene.figures_bounds(self.figures, self.props)
             self.camera.target = (lo + hi) / 2
@@ -502,6 +507,7 @@ class Editor:
             "info": [tr(paragraph) for paragraph in scene.ABOUT] if self.show_info else [],
             "info_title": tr(scene.ABOUT_TITLE),
             "active": {"limits": self.skel.limits_on, "help": self.show_help, "info": self.show_info,
+                       "floor_grid": self.show_floor,
                        "pin": self.selected is not None and self.selected in self.skel.pins,
                        "drag_mode": self.drag_mode},
             "exercise": self.exercise, "exercise_label": tr(self.exercise) if self.exercise else "",

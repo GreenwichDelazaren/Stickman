@@ -102,6 +102,7 @@ _UI = {
     "Centre the view on the figure (F)": "Κεντράρισμα της προβολής στη φιγούρα (F)",
     "Zoom in (+ or mouse wheel)": "Μεγέθυνση (+ ή ροδέλα ποντικιού)",
     "Zoom out (- or mouse wheel)": "Σμίκρυνση (- ή ροδέλα ποντικιού)",
+    "Show / hide the floor and grid (B)": "Εμφάνιση / απόκρυψη δαπέδου και πλέγματος (B)",
     "Show / hide the help (H)": "Εμφάνιση / απόκρυψη βοήθειας (H)",
     "Language: English. Switch to Greek (T)": "Γλώσσα: Ελληνικά. Αλλαγή σε αγγλικά (T)",
     "About Stickman (I)": "Σχετικά με το Stickman (I)",
