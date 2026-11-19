@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.util.Log
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -16,6 +17,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
@@ -33,16 +35,35 @@ import org.json.JSONObject
 class MainActivity : ComponentActivity() {
     private lateinit var web: WebView
     private var chooser: ValueCallback<Array<Uri>>? = null  // the page's file input, waiting for a file
-    private var saving: ByteArray? = null                   // the file waiting for a place to go
+    @Volatile private var opened: String? = null            // a picked file the page hasn't taken yet
 
-    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        chooser?.onReceiveValue(uri?.let { arrayOf(it) })
+    private val pickFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        // Some pickers give the file as clip data instead of the intent's data.
+        val uri = result.data?.data ?: result.data?.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        // The WebView drops a picked file whose type doesn't match the input's accept list (Downloads calls
+        // a .json file application/octet-stream), so the page never gets it through the file input: the
+        // input is answered empty and the file is read here and handed to the page (Host.opened). If Android
+        // closed the app behind the file dialog, the new page takes it when it has started.
+        chooser?.onReceiveValue(null)
         chooser = null
+        if (uri != null) {
+            opened = try {
+                val data = contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+                JSONObject().put("name", displayName(uri)).put("data", Base64.encodeToString(data, Base64.NO_WRAP))
+                    .toString()
+            } catch (e: Exception) {
+                Log.w("Stickman", "could not read $uri", e)
+                null
+            }
+            web.evaluateJavascript("window.stickmanOpened && window.stickmanOpened()", null)
+        }
     }
 
     private val createFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val data = saving
-        saving = null
+        // The file waits in the cache, not in memory: Android may close the app behind the save dialog,
+        // and then this result reaches a new activity.
+        val data = savingFile.takeIf { it.exists() }?.readBytes()
+        savingFile.delete()
         val uri = result.data?.data
         if (data != null && uri != null) write(uri, data)
     }
@@ -75,7 +96,10 @@ class MainActivity : ComponentActivity() {
                                            params: FileChooserParams): Boolean {
                 chooser?.onReceiveValue(null)
                 chooser = callback
-                pickFile.launch(arrayOf("*/*"))  // file managers often don't know .json
+                pickFile.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "*/*"  // file managers often don't know .json
+                })
                 return true
             }
         }
@@ -124,11 +148,19 @@ class MainActivity : ComponentActivity() {
 
     /** Called by web/app.js, on a WebView thread. */
     private inner class Host {
+        /** The picked file the page hasn't taken yet, as {name, data (base64)}, or "". */
+        @JavascriptInterface
+        fun opened(): String {
+            val file = opened ?: return ""
+            opened = null
+            return file
+        }
+
         @JavascriptInterface
         fun save(name: String, type: String, base64: String) {
             val data = Base64.decode(base64, Base64.DEFAULT)
             runOnUiThread {
-                saving = data
+                savingFile.writeBytes(data)
                 createFile.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     this.type = type
@@ -155,6 +187,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val savingFile get() = File(cacheDir, "saving")  // the file waiting for a place to go
+
     private fun write(uri: Uri, data: ByteArray) {
         val saved = try {
             contentResolver.openOutputStream(uri, "wt")!!.use { it.write(data) }
@@ -162,7 +196,11 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {
             false
         }
-        web.evaluateJavascript("window.stickmanSaved(${JSONObject.quote(displayName(uri))}, $saved)", null)
+        val name = displayName(uri)
+        // A page that has only just restarted can't say it yet, so the app does (in English: the page has the Greek).
+        web.evaluateJavascript("window.stickmanSaved ? (window.stickmanSaved(${JSONObject.quote(name)}, $saved), true) : false") {
+            if (it != "true") Toast.makeText(this, if (saved) "Saved $name" else "Could not save $name", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun displayName(uri: Uri): String =

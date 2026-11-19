@@ -128,6 +128,8 @@ async function start() {
   setupComposer();
   resize();
   if (host) restorePose();
+  if (host) window.stickmanOpened = takeOpened;
+  takeOpened();  // a file picked while Android had closed the app behind the file dialog
   $("loading").remove();
   performance.mark("ready");
   window.stickman = { py, app, renderJob, toggleComposer };  // for testing from the browser console or Playwright
@@ -586,6 +588,15 @@ function openPose(file) {
     refreshComposer();
     dirty = true;
   });
+}
+
+// In the app, MainActivity.kt reads a picked file itself (the WebView drops files whose type doesn't
+// match the input's accept list) and calls this; it keeps the file until the page has started.
+function takeOpened() {
+  const opened = host && host.opened ? host.opened() : "";
+  if (!opened) return;
+  const { name, data } = JSON.parse(opened);
+  openPose(new File([Uint8Array.from(atob(data), (c) => c.charCodeAt(0))], name));
 }
 
 // Android can close the app while it's in the background (even behind the file or share dialogs).
