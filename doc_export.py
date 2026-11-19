@@ -38,6 +38,15 @@ PT_PER_MM = 72 / 25.4
 DOCUMENT_PART = "stickman/document.json"
 DOCUMENT_REL = "urn:stickman:document"
 TEXT_COLOR = (0.1, 0.1, 0.1)
+CREDIT_COLOR = (0.45, 0.45, 0.45)
+CREDIT_SIZE = 7.0  # pt
+CREDIT_LINE = 3.0  # mm between baselines
+CREDIT_POS = (5.0, 3.0)  # mm from the page's top left corner, in the margin
+
+
+def _credit():
+    """The lines at the top left of every page: the program, its version, author and contact."""
+    return [tr(line) for line in scene.CREDIT]
 SLACK = 3.0  # mm: the Word page is this much longer than the layout, for the paragraphs between tables
 MIME = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -324,6 +333,31 @@ def _w_group(shapes, rect, pid, name):
     return _inline(group, _emu(w), _emu(h), pid, name, "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup")
 
 
+def _w_credit(pid):
+    """The credit as a text box anchored to the page's top left corner (not in the flow, so the layout stays)."""
+    size = round(CREDIT_SIZE * 2)
+    color = office_clip._hex(CREDIT_COLOR)
+    paras = "".join(
+        f'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="{_tw(CREDIT_LINE)}" w:lineRule="exact"/></w:pPr>'
+        f'<w:r><w:rPr><w:color w:val="{color}"/><w:sz w:val="{size}"/><w:szCs w:val="{size}"/></w:rPr>'
+        f'<w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>' for line in _credit())
+    cx, cy = _mm_emu(120), _mm_emu(CREDIT_LINE * len(_credit()) + 1)
+    x, y = (_mm_emu(v) for v in CREDIT_POS)
+    shape = (f'<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/>'
+             f'</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></wps:spPr>'
+             f'<wps:txbx><w:txbxContent>{paras}</w:txbxContent></wps:txbx><wps:bodyPr rot="0" wrap="square" '
+             f'lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp>')
+    anchor = (f'<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="{pid}" '
+              f'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
+              f'<wp:positionH relativeFrom="page"><wp:posOffset>{x}</wp:posOffset></wp:positionH>'
+              f'<wp:positionV relativeFrom="page"><wp:posOffset>{y}</wp:posOffset></wp:positionV>'
+              f'<wp:extent cx="{cx}" cy="{cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>'
+              f'<wp:docPr id="{pid}" name={quoteattr(tr("Credit"))}/><wp:cNvGraphicFramePr/><a:graphic>'
+              f'<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">{shape}'
+              f'</a:graphicData></a:graphic></wp:anchor>')
+    return _w_tiny(_w_run(f'<w:drawing>{anchor}</w:drawing>'))
+
+
 def _w_run(drawing):
     return f'<w:r><w:rPr><w:noProof/></w:rPr>{drawing}</w:r>'
 
@@ -401,12 +435,13 @@ def build_docx(doc, images, tattoo):
             trs.append(f'<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="{_tw(slot_h)}" w:hRule="exact"/></w:trPr>'
                        + "".join(tcs) + '</w:tr>')
         grid = "".join(f'<w:gridCol w:w="{_tw(slot_w)}"/>' for _ in range(cols))
-        tables.append(f'<w:tbl><w:tblPr><w:tblW w:w="{_tw(slot_w) * cols}" w:type="dxa"/>'
+        tables.append(_w_credit(pid) + f'<w:tbl><w:tblPr><w:tblW w:w="{_tw(slot_w) * cols}" w:type="dxa"/>'
                       f'<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/>'
                       f'<w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/>'
                       f'</w:tblCellMar><w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" '
                       f'w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr><w:tblGrid>{grid}</w:tblGrid>'
                       + "".join(trs) + '</w:tbl>')
+        pid += 1
     page_break = _w_tiny('<w:r><w:rPr><w:sz w:val="2"/></w:rPr><w:br w:type="page"/></w:r>')
     orient = ' w:orient="landscape"' if s["orientation"] == "landscape" else ""
     section = (f'<w:sectPr><w:pgSz w:w="{_tw(pw)}" w:h="{_tw(ph)}"{orient}/>'
@@ -466,6 +501,20 @@ def _p_caption(lines, cell, sid, number):
             f'<a:lstStyle/>{"".join(paras)}</p:txBody></p:sp>')
 
 
+def _p_credit(sid):
+    paras = "".join(
+        f'<a:p><a:pPr><a:lnSpc><a:spcPts val="{round(CREDIT_LINE * PT_PER_MM * 100)}"/></a:lnSpc>'
+        f'<a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft></a:pPr>'
+        f'<a:r><a:rPr lang="en-GB" sz="{round(CREDIT_SIZE * 100)}" dirty="0">{_fill(CREDIT_COLOR)}'
+        f'<a:latin typeface="{ttf.OFFICE_FONT}"/><a:cs typeface="{ttf.OFFICE_FONT}"/></a:rPr>'
+        f'<a:t>{escape(line)}</a:t></a:r></a:p>' for line in _credit())
+    box = (*CREDIT_POS, 120, CREDIT_LINE * len(_credit()) + 1)
+    return (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name={quoteattr(tr("Credit"))}/><p:cNvSpPr txBox="1"/><p:nvPr/>'
+            f'</p:nvSpPr><p:spPr><a:xfrm>{_p_box(box)}</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+            f'<a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t">'
+            f'<a:noAutofit/></a:bodyPr><a:lstStyle/>{paras}</p:txBody></p:sp>')
+
+
 def build_pptx(doc, images, tattoo):
     lay = composer.layout(doc)
     pw, ph = lay["page"]
@@ -504,6 +553,8 @@ def build_pptx(doc, images, tattoo):
                 sid += 1
             items.append(_p_caption(cell["lines"], cell["cell"], sid, number))
             sid += 1
+        items.append(_p_credit(sid))
+        sid += 1
         tree = office_clip._EMPTY_TREE.replace('</p:spTree>', "".join(items) + '</p:spTree>')
         slides.append((f'{office_clip._XML}<p:sld {office_clip._NS}>{tree}{office_clip._NO_COLOR_MAP}</p:sld>',
                        parts.xml(("slideLayout", "../slideLayouts/slideLayout1.xml"))))
@@ -730,6 +781,11 @@ def build_pdf(doc, images, tattoo):
                 y = page_h - _baseline(line, font) * PT_PER_MM
                 ops.append(f"BT {_rgb(TEXT_COLOR)} rg /F{2 if line['bold'] else 1} {_n(size_pt)} Tf {_n(x)} {_n(y)} Td "
                            f"{font.encode(line['text'])} Tj ET")
+        for k, text in enumerate(_credit()):
+            x = CREDIT_POS[0] * PT_PER_MM
+            y = page_h - (CREDIT_POS[1] + CREDIT_LINE * (k + 0.8)) * PT_PER_MM
+            ops.append(f"BT {_rgb(CREDIT_COLOR)} rg /F1 {_n(CREDIT_SIZE)} Tf {_n(x)} {_n(y)} Td "
+                       f"{fonts[False].encode(text)} Tj ET")
         content = pdf.stream("\n".join(ops).encode("latin-1"))
         xo = " ".join(f"/{k} {v} 0 R" for k, v in xobjects.items())
         page_objs.append(pdf.add(f"<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 {_n(page_w)} {_n(page_h)}] "

@@ -118,7 +118,7 @@ def build_glb(parts, rotation=None, offset=None):
         nodes.append({"name": part["name"], "mesh": len(meshes) - 1})
 
     doc = {
-        "asset": {"version": "2.0", "generator": "Stickman Poser"},
+        "asset": {"version": "2.0", "generator": "Stickman Studio"},
         "scene": 0,
         "scenes": [{"nodes": list(range(len(nodes)))}],
         "nodes": nodes, "meshes": meshes, "materials": materials,

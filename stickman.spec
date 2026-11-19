@@ -1,5 +1,5 @@
 # PyInstaller recipe for the stand-alone Windows program: pyinstaller --noconfirm stickman.spec
-# The result is "dist/Stickman Poser.exe", one file that needs no Python on the other computer.
+# The result is "dist/Stickman Studio.exe", one file that needs no Python on the other computer.
 
 import os
 import sys
@@ -18,7 +18,7 @@ exe = EXE(
     analysis.scripts,
     analysis.binaries,
     analysis.datas,
-    name="Stickman Poser",
+    name="Stickman Studio",
     icon=icon_file,
     console=False,
     upx=False,

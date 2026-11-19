@@ -1,4 +1,4 @@
-"""Stickman Poser: pose a 3D stick figure to illustrate exercises.
+"""Stickman Studio: pose a 3D stick figure to illustrate exercises.
 
 Run with:  python main.py
 """
@@ -479,7 +479,7 @@ class ExerciseMenu:
 class App:
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("Stickman Poser")
+        pygame.display.set_caption("Stickman Studio")
         pygame.display.set_icon(icons.app_icon(64))
         self._open_window((1280, 800))
         self.font = pygame.font.SysFont("consolas", 15)

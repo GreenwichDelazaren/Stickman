@@ -1,6 +1,6 @@
 """Build the Android app: the website (web/build.py) with its libraries, in a WebView.
 
-    python android/build.py             # -> dist/Stickman Poser.apk, a debug build to try on a phone
+    python android/build.py             # -> dist/Stickman Studio.apk, a debug build to try on a phone
     python android/build.py --release   # the same, signed with android/keystore.properties
 
 Needs the Android SDK (ANDROID_HOME) and a JDK (17 or newer). The app works offline, so the libraries
@@ -22,7 +22,7 @@ CACHE = os.path.join(ANDROID, "cache")
 GENERATED = os.path.join(ANDROID, "generated")
 SITE = os.path.join(GENERATED, "assets", "site")
 RES = os.path.join(GENERATED, "res")
-OUTPUT = os.path.join(ROOT, "dist", "Stickman Poser.apk")
+OUTPUT = os.path.join(ROOT, "dist", "Stickman Studio.apk")
 
 sys.path.insert(0, ROOT)
 

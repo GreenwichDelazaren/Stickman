@@ -121,6 +121,7 @@ _UI = {
     "Page {} of {}": "Σελίδα {} από {}",
     "Caption": "Λεζάντα",
     "Caption {}": "Λεζάντα {}",
+    "Credit": "Δημιουργός",
     "Description": "Περιγραφή",
     "Short description or instruction": "Σύντομη περιγραφή ή οδηγία",
     "Move earlier": "Μετακίνηση νωρίτερα",

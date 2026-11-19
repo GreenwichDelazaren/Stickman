@@ -19,7 +19,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 1
-        versionName = findProperty("stickmanVersion") as String? ?: "1.0"  // android/build.py: scene.VERSION
+        versionName = findProperty("stickmanVersion") as String? ?: "2.0"  // android/build.py: scene.VERSION
     }
 
     signingConfigs {

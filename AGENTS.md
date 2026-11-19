@@ -19,7 +19,7 @@ python web/serve.py    # http://localhost:8000 (python -m http.server serves .js
 The stand-alone Windows program is built with PyInstaller (not in `requirements.txt`, it's only needed for this):
 
 ```
-python -m PyInstaller --noconfirm stickman.spec    # -> "dist/Stickman Poser.exe", one file, no console
+python -m PyInstaller --noconfirm stickman.spec    # -> "dist/Stickman Studio.exe", one file, no console
 ```
 
 There is no test suite or linter config. Everything except `main.py` and `icons.py` is free of pygame/OpenGL, so pose logic and the exports can be checked headlessly:

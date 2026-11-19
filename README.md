@@ -1,4 +1,4 @@
-# Stickman Poser
+# Stickman Studio
 
 Pose a 3D stick figure standing on a floor to illustrate exercises
 (pull-ups, push-ups, lunges, ...). Drag any joint with the mouse; bone lengths
@@ -20,7 +20,7 @@ files: try it at https://greenwichdelazaren.github.io/Stickman/ or see
 [Website](#website) below.
 
 To make a stand-alone Windows program that needs no Python on the other
-computer (`dist/Stickman Poser.exe`):
+computer (`dist/Stickman Studio.exe`):
 
 ```
 pip install pyinstaller
@@ -275,8 +275,8 @@ the libraries are downloaded once, into `android/cache`. With Node.js installed
 the build also precompiles numpy, which makes the app start faster.
 
 ```
-python android/build.py      # -> dist/Stickman Poser.apk
-adb install -r "dist/Stickman Poser.apk"
+python android/build.py      # -> dist/Stickman Studio.apk
+adb install -r "dist/Stickman Studio.apk"
 ```
 
 That is a debug build, for trying on your own phone. For a release build,
