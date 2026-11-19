@@ -15,6 +15,7 @@ from i18n import tr
 
 BG, PANEL, TEXT, DIM, ACTIVE = "#191e26", "#262c36", "#ebeef2", "#96a0af", "#2e68c4"
 PAGE_GAP = 14
+MAX_PAGE = 2400  # pixels: the widest a page is drawn, however far it's zoomed (Tk images are memory)
 
 
 class ComposerWindow:
@@ -160,7 +161,9 @@ class ComposerWindow:
         self.canvas.configure(yscrollcommand=lambda a, b: (scroll.set(a, b), self._track_page()))
         scroll.pack(side="right", fill="y")
         self.canvas.pack(side="left", fill="both", expand=True)
-        self.canvas.bind("<Configure>", lambda e: self.draw_pages())
+        # Redrawn once the size settles: drawing (and making images) inside Windows' resize loop can
+        # crash Tk.
+        self.canvas.bind("<Configure>", lambda e: self.redraw_later())
         self.canvas.bind("<MouseWheel>", self._wheel)
         self.canvas.bind("<ButtonPress-1>", self._press)
         self.canvas.bind("<B1-Motion>", self._motion)
@@ -328,9 +331,20 @@ class ComposerWindow:
 
     # --- the pages -----------------------------------------------------------------------
 
+    _pending = None
+
+    def redraw_later(self, delay=120):
+        if self._pending is not None:
+            self.win.after_cancel(self._pending)
+        self._pending = self.win.after(delay, self._redraw)
+
+    def _redraw(self):
+        self._pending = None
+        self.draw_pages()
+
     def set_zoom(self, zoom):
         self.zoom = min(4.0, max(0.3, zoom))
-        self.draw_pages()
+        self.redraw_later(30)
 
     def _geometry(self):
         doc = self.data["doc"]
@@ -338,7 +352,7 @@ class ComposerWindow:
         avail_w = max(100, self.canvas.winfo_width() - 2 * PAGE_GAP)
         avail_h = max(100, self.canvas.winfo_height() - 2 * PAGE_GAP)
         fit = min(avail_w, avail_h * pw / ph * 1.6)
-        scale = max(80, fit * self.zoom) / pw
+        scale = min(MAX_PAGE, max(80, fit * self.zoom)) / pw
         left = max(PAGE_GAP, (self.canvas.winfo_width() - pw * scale) / 2)
         return pw, ph, scale, left
 

@@ -65,6 +65,18 @@ def default_poses_dir():
 
 
 POSES_DIR = default_poses_dir()
+ERROR_LOG = os.path.join(POSES_DIR, "stickman-errors.log")
+
+
+def log_error(exc_type, exc, tb):
+    """Append a traceback to ERROR_LOG (the .exe has no console to print it on)."""
+    import traceback
+    try:
+        os.makedirs(POSES_DIR, exist_ok=True)
+        with open(ERROR_LOG, "a", encoding="utf-8") as f:
+            f.write(time.strftime("--- %Y-%m-%d %H:%M:%S") + chr(10) + "".join(traceback.format_exception(exc_type, exc, tb)))
+    except OSError:
+        pass
 
 
 def tattoo_image():
@@ -226,6 +238,7 @@ def tk_root():
         _tk = tk.Tk()
         _tk.withdraw()
         _tk.iconphoto(True, tk.PhotoImage(master=_tk, data=icons.app_icon_png(48)))
+        _tk.report_callback_exception = log_error  # a failing button or redraw in the composer window
     return _tk
 
 
@@ -558,6 +571,7 @@ class App:
                 try:
                     _tk.update()
                 except Exception as exc:  # a callback failed: say so and carry on
+                    log_error(type(exc), exc, exc.__traceback__)
                     self.say(str(exc))
             clock.tick(60)
         if _tk is not None:
@@ -1423,4 +1437,16 @@ class App:
 
 
 if __name__ == "__main__":
-    App().run()
+    sys.excepthook = log_error
+    try:  # a crash in C code (Tk, SDL, OpenGL) leaves the Python stack in the log
+        import faulthandler
+        os.makedirs(POSES_DIR, exist_ok=True)
+        _crash_log = open(ERROR_LOG, "a", encoding="utf-8")
+        faulthandler.enable(_crash_log)
+    except (OSError, RuntimeError):
+        pass
+    try:
+        App().run()
+    except BaseException:
+        log_error(*sys.exc_info())
+        raise
