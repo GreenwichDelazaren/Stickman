@@ -46,6 +46,7 @@ import office_clip
 import props
 import scene
 import skeleton as sk
+import tk_thread
 from composer_actions import composer_action, open_any
 from i18n import tr
 from scene import (BACKGROUND, BONE_RADIUS, FACE, FLOOR_COLOR, FLOOR_HALF, GRID_COLOR, GRID_STEP, LIGHT_DIR,
@@ -228,26 +229,26 @@ def gl_matrix(m):
     return np.ascontiguousarray(m.T, dtype=np.float32)
 
 
-_tk = None  # the one Tk: the file dialogs and the Document Composer window
-
-
-def tk_root():
-    global _tk
-    if _tk is None:
-        import tkinter as tk
-        _tk = tk.Tk()
-        _tk.withdraw()
-        _tk.iconphoto(True, tk.PhotoImage(master=_tk, data=icons.app_icon_png(48)))
-        _tk.report_callback_exception = log_error  # a failing button or redraw in the composer window
-    return _tk
+def _tk_icon():
+    """The app icon on the Tk windows (runs on the Tk thread)."""
+    import tkinter as tk
+    root = tk_thread.root()
+    if not getattr(root, "_icon_set", False):
+        root.iconphoto(True, tk.PhotoImage(master=root, data=icons.app_icon_png(48)))
+        root._icon_set = True
 
 
 def ask_file(save, title, extension, kind, more=(), initialfile=""):
-    """A file dialog; more are other (kind, pattern) choices for opening."""
+    """A file dialog (on the Tk thread); more are other (kind, pattern) choices for opening."""
+    return tk_thread.on_tk(_ask_file, save, title, extension, kind, more, initialfile)
+
+
+def _ask_file(save, title, extension, kind, more, initialfile):
     from tkinter import filedialog
 
     os.makedirs(POSES_DIR, exist_ok=True)
-    root = tk_root()
+    _tk_icon()
+    root = tk_thread.root()
     root.attributes("-topmost", True)
     try:
         filetypes = [(tr(kind), "*" + extension)] + [(tr(k), p) for k, p in more] + [(tr("All files"), "*.*")]
@@ -520,7 +521,6 @@ class App:
         self.composer_window = None
         self.previews = {}             # composer preview pictures: render_jobs key -> RGBA
         self._preview_jobs = {}        # key -> job, of the current document
-        self._photos = {}              # (key, w, h) -> Tk PhotoImage shown in the composer window
         self.running = True
         self._update_matrices()
 
@@ -567,15 +567,13 @@ class App:
             self.repeat_held()
             self.render()
             pygame.display.flip()
-            if _tk is not None:
-                try:
-                    _tk.update()
-                except Exception as exc:  # a callback failed: say so and carry on
-                    log_error(type(exc), exc, exc.__traceback__)
-                    self.say(str(exc))
+            try:
+                tk_thread.run_main_calls()  # what the composer window asked for
+            except Exception as exc:  # a callback failed: say so and carry on
+                log_error(type(exc), exc, exc.__traceback__)
+                self.say(str(exc))
             clock.tick(60)
-        if _tk is not None:
-            _tk.destroy()
+        tk_thread.stop()
         pygame.quit()
 
     def say(self, text):
@@ -787,7 +785,7 @@ class App:
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
             if self.composer_window is not None:
-                self.composer_window.rebuild()
+                tk_thread.on_tk(self.composer_window.rebuild)
         elif key == pygame.K_n:
             self.composer_do("add")
         elif key == pygame.K_v:
@@ -905,7 +903,7 @@ class App:
             return self.drag_mode == action
         return {(pygame.K_l, 0): self.skel.limits_on, (pygame.K_h, 0): self.show_help, (pygame.K_i, 0): self.show_info,
                 (pygame.K_b, 0): self.show_floor,
-                (pygame.K_v, 0): self.composer_window is not None and self.composer_window.visible,
+                (pygame.K_v, 0): self.composer_window is not None and self.composer_window.shown,
                 (pygame.K_p, 0): self.selected in self.skel.pins}.get(action, False)
 
     def draw_toolbar(self):
@@ -1104,16 +1102,21 @@ class App:
     # --- the Document Composer ---------------------------------------------------
 
     def toggle_composer(self, show=None):
-        from composer_window import ComposerWindow
-        if self.composer_window is None or not self.composer_window.win.winfo_exists():
-            self.composer_window = ComposerWindow(tk_root(), self)
+        """Show or hide the composer window (made on the Tk thread the first time)."""
+        if self.composer_window is None:
+            from composer_window import ComposerWindow
+
+            def make():
+                _tk_icon()
+                return ComposerWindow(tk_thread.root(), tk_thread.MainProxy(self))
+            self.composer_window = tk_thread.on_tk(make)
             return
-        show = not self.composer_window.visible if show is None else show
-        self.composer_window.show() if show else self.composer_window.hide()
+        show = not self.composer_window.shown if show is None else show
+        tk_thread.on_tk(self.composer_window.show if show else self.composer_window.hide)
 
     def refresh_composer(self):
-        if self.composer_window is not None and self.composer_window.visible:
-            self.composer_window.refresh()
+        if self.composer_window is not None and self.composer_window.shown:
+            tk_thread.on_tk(self.composer_window.refresh)
 
     def composer_do(self, name, arg=None):
         """A composer action (composer_actions), from the window or a key."""
@@ -1130,29 +1133,21 @@ class App:
             self._preview_jobs = {j["key"]: j for j in composer.render_jobs(doc, "preview")}
         return out
 
-    def composer_photo(self, key, size):
-        """The preview picture of key at size (w, h) as a Tk image, rendered when first needed."""
-        if (key,) + size in self._photos:
-            return self._photos[(key,) + size]
+    def composer_png(self, key, size):
+        """The preview picture of key at size (w, h) as PNG bytes, rendered when first needed (or None)."""
         if key not in self.previews:
             job = self._preview_jobs.get(key)
             if job is None:
                 return None
             self.previews[key] = self.render_picture(job)
-        import base64
-        import tkinter as tk
         rgba = self.previews[key]
         surface = pygame.image.frombuffer(rgba.tobytes(), (rgba.shape[1], rgba.shape[0]), "RGBA")
         surface = pygame.transform.smoothscale(surface, size)
         png = io.BytesIO()
         pygame.image.save(surface, png, "png")
-        photo = tk.PhotoImage(master=tk_root(), data=base64.b64encode(png.getvalue()))
-        self._photos[(key,) + size] = photo
-        return photo
+        return png.getvalue()
 
-    def composer_keep(self, shown):
-        """Forget the Tk images no longer shown (zooming makes new ones)."""
-        self._photos = {k: v for k, v in self._photos.items() if k in shown}
+    def composer_keep(self):
         if len(self.previews) > 300:
             self.previews.clear()
 
@@ -1435,6 +1430,8 @@ class App:
         glDisable(GL_BLEND)
         glEnable(GL_DEPTH_TEST)
 
+
+tk_thread.error_handler = log_error  # a failing button or redraw in the composer window
 
 if __name__ == "__main__":
     sys.excepthook = log_error

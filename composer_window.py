@@ -3,7 +3,8 @@
 It shows composer.summary() and sends every button and field to composer_actions through the host
 (main.App), which also renders the preview pictures with OpenGL, and saves and exports. The pages
 are drawn from composer.layout() geometry, as the website's composer and the exports place them.
-The window stays open while posing: main.App.run() calls update() every frame.
+It lives on the Tk thread (tk_thread.py); host is a tk_thread.MainProxy, so its methods run on
+the main thread, and the window keeps the Tk images it makes from the host's PNGs.
 """
 
 import tkinter as tk
@@ -23,6 +24,7 @@ class ComposerWindow:
         self.host = host
         self.zoom, self.page_shown = 1.0, 0
         self.photos = {}          # (key, w, h) -> PhotoImage, kept alive while shown
+        self.shown = True         # read by the main thread (the toolbar button)
         self.drag = None
         self.win = tk.Toplevel(root)
         self.win.title(tr("Document Composer"))
@@ -55,11 +57,13 @@ class ComposerWindow:
         self.host.composer_do(name, arg)
 
     def show(self):
+        self.shown = True
         self.win.deiconify()
         self.win.lift()
         self.refresh()
 
     def hide(self):
+        self.shown = False
         self.win.withdraw()
 
     @property
@@ -384,7 +388,7 @@ class ComposerWindow:
                 cx, cy, cw, ch = cell["cell"]
                 X, Y = left + x * scale, top + y * scale
                 size = (max(1, round(w * scale)), max(1, round(h * scale)))
-                photo = self.host.composer_photo(cell["key"], size)
+                photo = self.photo(cell["key"], size)
                 if photo is not None:
                     c.create_image(X, Y, image=photo, anchor="nw")
                     shown.add((cell["key"],) + size)
@@ -401,8 +405,19 @@ class ComposerWindow:
                                   font=(family, -px, "bold" if line["bold"] else "normal"))
         total = self.page_top(len(doc["pages"])) + PAGE_GAP
         c.configure(scrollregion=(0, 0, max(c.winfo_width(), left * 2 + pw * scale), total))
-        self.host.composer_keep(shown)
+        self.photos = {k: v for k, v in self.photos.items() if k in shown}
+        self.host.composer_keep()
         self._track_page()
+
+    def photo(self, key, size):
+        """The preview picture of key at size as a Tk image (the host renders it), or None."""
+        if (key,) + size not in self.photos:
+            import base64
+            png = self.host.composer_png(key, size)
+            if png is None:
+                return None
+            self.photos[(key,) + size] = tk.PhotoImage(master=self.win, data=base64.b64encode(png))
+        return self.photos[(key,) + size]
 
     _family_list = None
 
