@@ -69,7 +69,7 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | N | Add the figure(s) to the current document (see Documents below) |
 | V | Show / hide the Document Composer |
 | T | Switch language: Greek / English (the flag button) |
-| I | Show / hide what Stickman is and how it came about (the i button, first on the toolbar). The OK button closes this box or the help |
+| I | Show / hide what Stickman is and how it came about (the i button, at the end of the toolbar beside help and the flag). The OK button closes this box or the help |
 
 ## Exercises
 
@@ -248,8 +248,9 @@ Ctrl+S, Ctrl+E and Ctrl+Shift+E open the browser's save dialog where it has
 one (Chrome, Edge) and download the file otherwise. The SVG copy needs a
 recent Chrome or Edge; other browsers copy the PNG only.
 
-On a phone or tablet the toolbar becomes a row of tabs (File, Edit, Drag,
-Joint, Figure, View, Document) with bigger buttons under the open one; undo and redo stay
+On a phone or tablet the toolbar becomes a row of tabs (File, Document, Edit, Drag,
+Joint, Figure, View; the same groups, in the same order, as the toolbar on a
+computer) with bigger buttons under the open one; undo and redo stay
 visible. Pressing a button shows its name.
 
 | Touch | Action |

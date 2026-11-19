@@ -165,14 +165,15 @@ CTRL, SHIFT = pygame.KMOD_CTRL, pygame.KMOD_SHIFT
 # Toolbar groups of (icon, tooltip, action), icons named as in icons.ICONS ("language" shows the flag of the
 # current language).  An action is a (key, modifiers) pair, so a click does exactly what the key does, or a
 # drag mode name.  Tooltips are translated with tr() when shown.
-TOOLBAR = [
-    [("info", "About Stickman (I)", (pygame.K_i, 0))],
+TOOLBAR = [  # File, Document, Edit, Drag, Joint, Figure, View, Help
     [("open", "Open a pose (Ctrl+O)", (pygame.K_o, CTRL)),
      ("save", "Save the pose (Ctrl+S)", (pygame.K_s, CTRL)),
      ("png", "Export a PNG image (Ctrl+E)", (pygame.K_e, CTRL)),
      ("copy", "Copy as editable shapes for Word or PowerPoint (Ctrl+C)", (pygame.K_c, CTRL)),
      ("copy_3d", "Copy as a 3D model for Word or PowerPoint (Ctrl+Shift+C)", (pygame.K_c, CTRL | SHIFT)),
      ("save_3d", "Export a 3D model file, .glb (Ctrl+Shift+E)", (pygame.K_e, CTRL | SHIFT))],
+    [("add_to_document", "Add the figure to the document (N)", (pygame.K_n, 0)),
+     ("document", "Document Composer: arrange, preview and export (V)", (pygame.K_v, 0))],
     [("undo", "Undo (Ctrl+Z)", (pygame.K_z, CTRL)),
      ("redo", "Redo (Ctrl+Y)", (pygame.K_y, CTRL)),
      ("reset", "Reset the pose (R)", (pygame.K_r, 0)),
@@ -201,11 +202,11 @@ TOOLBAR = [
      ("centre", "Centre the view on the figure (F)", (pygame.K_f, 0)),
      ("zoom_in", "Zoom in (+ or mouse wheel)", (pygame.K_EQUALS, 0)),
      ("zoom_out", "Zoom out (- or mouse wheel)", (pygame.K_MINUS, 0)),
-     ("floor_grid", "Show / hide the floor and grid (B)", (pygame.K_b, 0)),
-     ("help", "Show / hide the help (H)", (pygame.K_h, 0))],
-    [("add_to_document", "Add the figure to the document (N)", (pygame.K_n, 0)),
-     ("document", "Document Composer: arrange, preview and export (V)", (pygame.K_v, 0))],
-    [("language", "Language: English. Switch to Greek (T)", (pygame.K_t, 0))],
+     ("floor_grid", "Show / hide the floor and grid (B)", (pygame.K_b, 0))],
+    [("help", "Show / hide the help (H)", (pygame.K_h, 0)),
+     ("info", "About Stickman (I)", (pygame.K_i, 0)),
+     ("language", "Language: English. Switch to Greek (T)", (pygame.K_t, 0))],
+
 ]
 # The buttons to the right of the exercise list, as TOOLBAR items.
 MENU_STEPS = [("exercise_previous", "Previous exercise (Page Up)", (pygame.K_PAGEUP, 0)),

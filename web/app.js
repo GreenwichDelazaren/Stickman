@@ -5,14 +5,15 @@ import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodi
 
 // Toolbar groups as main.TOOLBAR: icon (icons.ICONS name), tooltip (English, translated by i18n), and
 // either an action (a key's action, see keyAction) with an optional forced Shift, or a drag mode.
-const TOOLBAR = [
-  [{ icon: "info", tip: "About Stickman (I)", action: "info" }],
+const TOOLBAR = [  // File, Document, Edit, Drag, Joint, Figure, View, Help (as TABS)
   [{ icon: "open", tip: "Open a pose (Ctrl+O)", action: "open" },
    { icon: "save", tip: "Save the pose (Ctrl+S)", action: "save" },
    { icon: "png", tip: "Export a PNG image (Ctrl+E)", action: "png" },
    { icon: "copy", tip: "Copy as a picture for Word or PowerPoint (Ctrl+C)", action: "copy" },
    { icon: "save_shapes", tip: "Download as editable shapes for PowerPoint or Word, .pptx (Ctrl+Shift+S)", action: "pptx" },
    { icon: "save_3d", tip: "Export a 3D model file, .glb (Ctrl+Shift+E)", action: "glb" }],
+  [{ icon: "add_to_document", tip: "Add the figure to the document (N)", action: "add_to_document" },
+   { icon: "document", tip: "Document Composer: arrange, preview and export (V)", action: "composer" }],
   [{ icon: "undo", tip: "Undo (Ctrl+Z)", action: "undo" },
    { icon: "redo", tip: "Redo (Ctrl+Y)", action: "redo" },
    { icon: "reset", tip: "Reset the pose (R)", action: "reset" },
@@ -41,11 +42,11 @@ const TOOLBAR = [
    { icon: "centre", tip: "Centre the view on the figure (F)", action: "centre" },
    { icon: "zoom_in", tip: "Zoom in (+ or mouse wheel)", action: "zoom_in" },
    { icon: "zoom_out", tip: "Zoom out (- or mouse wheel)", action: "zoom_out" },
-   { icon: "floor_grid", tip: "Show / hide the floor and grid (B)", action: "floor_grid" },
-   { icon: "help", tip: "Show / hide the help (H)", action: "help" }],
-  [{ icon: "add_to_document", tip: "Add the figure to the document (N)", action: "add_to_document" },
-   { icon: "document", tip: "Document Composer: arrange, preview and export (V)", action: "composer" }],
-  [{ icon: "language", tip: "Language: English. Switch to Greek (T)", action: "language" }],
+   { icon: "floor_grid", tip: "Show / hide the floor and grid (B)", action: "floor_grid" }],
+  [{ icon: "help", tip: "Show / hide the help (H)", action: "help" },
+   { icon: "info", tip: "About Stickman (I)", action: "info" },
+   { icon: "language", tip: "Language: English. Switch to Greek (T)", action: "language" }],
+
 ];
 // The buttons to the right of the exercise list (main.MENU_STEPS).
 const MENU_STEPS = [{ icon: "exercise_previous", tip: "Previous exercise (Page Up)", action: "exercise_previous" },
@@ -69,10 +70,10 @@ const MENU_PLACEHOLDER = "Choose an exercise (Tab)", MENU_TWO = "2 positions";
 
 // On a touch screen the groups of TOOLBAR (by index) go under tabs, so the buttons can be big enough for
 // a finger and still leave room for the figure. Undo and redo stay on the tabs' row.
-const TABS = [{ icon: "open", tip: "File", groups: [1, 0, 8] }, { icon: "reset", tip: "Edit", groups: [2] },
-              { icon: "drag_screen", tip: "Drag", groups: [3] }, { icon: "pin", tip: "Joint", groups: [4] },
-              { icon: "turn_left", tip: "Figure", groups: [5] }, { icon: "view_angled", tip: "View", groups: [6] },
-              { icon: "document", tip: "Document", groups: [7] }];
+const TABS = [{ icon: "open", tip: "File", groups: [0, 7] }, { icon: "document", tip: "Document", groups: [1] },
+              { icon: "reset", tip: "Edit", groups: [2] }, { icon: "drag_screen", tip: "Drag", groups: [3] },
+              { icon: "pin", tip: "Joint", groups: [4] }, { icon: "turn_left", tip: "Figure", groups: [5] },
+              { icon: "view_angled", tip: "View", groups: [6] }];
 const ALWAYS_SHOWN = new Set(["undo", "redo"]);
 const TIP_TIME = 1500;       // how long pressing a button shows its name on a touch screen
 const PINCH_HOLD = 200;      // ms: a second finger this soon after the first makes a pinch, even from a joint

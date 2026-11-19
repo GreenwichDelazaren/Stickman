@@ -224,7 +224,7 @@ html, body {
   html, body { overscroll-behavior: none; }
   #tools { flex-direction: column; gap: 4px; }
   .pages .group[hidden] { display: none; }
-  :root { --tool: min(42px, calc((100vw - 40px) / 8)); }
+  :root { --tool: min(42px, calc((100vw - 44px) / 9)); }  /* the tabs row: 7 tabs, undo and redo */
   .tool { height: 42px; }
   .tool img { width: 26px; height: 26px; }
   .tool img.flag { width: 34px; height: 34px; }
