@@ -19,7 +19,8 @@ DIST = os.path.join(WEB, "dist")
 
 # The modules the website runs, shared with the desktop app (none of them uses pygame or OpenGL).
 SHARED = ["geometry.py", "joint_limits.py", "skeleton.py", "exercises.py", "props.py", "gltf.py", "i18n.py",
-          "office_clip.py", "svg.py", "scene.py"]
+          "office_clip.py", "svg.py", "scene.py", "ttf.py", "composer.py", "doc_export.py", "composer_actions.py"]
+FONTS = ["StickmanSans-Regular.ttf", "StickmanSans-Bold.ttf", "OFL.txt"]  # ttf.FILES: the captions' font
 PAGE = ["index.html", "style.css", "app.js"]
 ICON_COLOR = (235, 238, 242)  # main.TOOL_COLORS["icon"]
 ICON_SIZE, FLAG_SIZE, SCALE = 20, 26, 2  # main.TOOL_ICON, TOOL_SIZE - 4; drawn at 2x for sharp screens
@@ -35,8 +36,11 @@ def build():
     modules = SHARED + ["bridge.py"]
     for name in modules:
         shutil.copy2(os.path.join(WEB if name == "bridge.py" else ROOT, name), os.path.join(DIST, "py"))
+    os.makedirs(os.path.join(DIST, "py", "fonts"))
+    for name in FONTS:  # read by ttf.py, and the composer's preview shows its captions in it
+        shutil.copy2(os.path.join(ROOT, "fonts", name), os.path.join(DIST, "py", "fonts"))
     with open(os.path.join(DIST, "py", "files.json"), "w", encoding="utf-8") as f:
-        json.dump(modules, f)
+        json.dump(modules + ["fonts/" + name for name in FONTS], f)
 
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("PYGAME_HIDE_SUPPORT_PROMPT", "1")

@@ -14,7 +14,7 @@ import sys
 DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dist")
 TYPES = {".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".html": "text/html",
          ".json": "application/json", ".png": "image/png", ".py": "text/plain; charset=utf-8",
-         ".wasm": "application/wasm"}
+         ".wasm": "application/wasm", ".ttf": "font/ttf"}
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):

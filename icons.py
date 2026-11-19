@@ -173,6 +173,24 @@ def _save_shapes(p):
     p.line((3, 12), (3, 17), (17, 17), (17, 12))
 
 
+def _document(p):
+    """A page with a 2 x 2 grid of figures: the Document Composer."""
+    p.line((4, 2), (12.5, 2), (16, 5.5), (16, 18), (4, 18), closed=True)
+    for x, y in ((6.5, 5.5), (11, 5.5), (6.5, 11.5), (11, 11.5)):
+        p.fill((x, y), (x + 3, y), (x + 3, y + 4), (x, y + 4))
+
+
+def _add_to_document(p):
+    """A page with a plus: add the figure to the document."""
+    p.line((3, 2), (11.5, 2), (15, 5.5), (15, 10))
+    p.line((9, 18), (3, 18), (3, 2))
+    p.ring((9, 6.5), 1.6)
+    p.line((9, 8.3), (9, 11.5))
+    p.line((6.5, 10), (9, 9), (11.5, 10))
+    p.line((14.5, 12), (14.5, 18.5), w=2.0)
+    p.line((11.25, 15.25), (17.75, 15.25), w=2.0)
+
+
 def _undo(p):
     p.arc_arrow((11, 11.5), 6, 6, -50, 175)
 
@@ -394,6 +412,8 @@ ICONS = {
     "copy_3d": (_copy_3d, False, 0),
     "save_3d": (_save_3d, False, 0),
     "save_shapes": (_save_shapes, False, 0),
+    "document": (_document, False, 0),
+    "add_to_document": (_add_to_document, False, 0),
     "undo": (_undo, False, 0),
     "redo": (_undo, True, 0),
     "reset": (_reset, False, 0),

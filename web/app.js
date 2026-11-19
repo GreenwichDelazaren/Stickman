@@ -43,6 +43,8 @@ const TOOLBAR = [
    { icon: "zoom_out", tip: "Zoom out (- or mouse wheel)", action: "zoom_out" },
    { icon: "floor_grid", tip: "Show / hide the floor and grid (B)", action: "floor_grid" },
    { icon: "help", tip: "Show / hide the help (H)", action: "help" }],
+  [{ icon: "add_to_document", tip: "Add the figure to the document (N)", action: "add_to_document" },
+   { icon: "document", tip: "Document Composer: arrange, preview and export (V)", action: "composer" }],
   [{ icon: "language", tip: "Language: English. Switch to Greek (T)", action: "language" }],
 ];
 // The buttons to the right of the exercise list (main.MENU_STEPS).
@@ -53,7 +55,7 @@ const KEYS = {
   KeyH: "help", KeyI: "info", KeyT: "language", Tab: "menu", Escape: "escape", KeyP: "pin", KeyM: "mirror",
   KeyZ: "twist_minus", KeyX: "twist_plus", KeyL: "limits", KeyG: "ground", KeyR: "reset",
   KeyQ: "turn_left", KeyE: "turn_right", KeyW: "tip_forward", KeyS: "tip_back", KeyA: "lean_left", KeyD: "lean_right",
-  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre", KeyB: "floor_grid", PageUp: "exercise_previous", PageDown: "exercise_next",
+  ArrowUp: "move_up", ArrowDown: "move_down", KeyF: "centre", KeyB: "floor_grid", KeyN: "add_to_document", KeyV: "composer", PageUp: "exercise_previous", PageDown: "exercise_next",
   Digit1: "view_front", Digit2: "view_side", Digit3: "view_top", Digit4: "view_angled",
   Numpad1: "view_front", Numpad2: "view_side", Numpad3: "view_top", Numpad4: "view_angled",
   Equal: "zoom_in", NumpadAdd: "zoom_in", Minus: "zoom_out", NumpadSubtract: "zoom_out",
@@ -67,14 +69,15 @@ const MENU_PLACEHOLDER = "Choose an exercise (Tab)", MENU_TWO = "2 positions";
 
 // On a touch screen the groups of TOOLBAR (by index) go under tabs, so the buttons can be big enough for
 // a finger and still leave room for the figure. Undo and redo stay on the tabs' row.
-const TABS = [{ icon: "open", tip: "File", groups: [1, 0, 7] }, { icon: "reset", tip: "Edit", groups: [2] },
+const TABS = [{ icon: "open", tip: "File", groups: [1, 0, 8] }, { icon: "reset", tip: "Edit", groups: [2] },
               { icon: "drag_screen", tip: "Drag", groups: [3] }, { icon: "pin", tip: "Joint", groups: [4] },
-              { icon: "turn_left", tip: "Figure", groups: [5] }, { icon: "view_angled", tip: "View", groups: [6] }];
+              { icon: "turn_left", tip: "Figure", groups: [5] }, { icon: "view_angled", tip: "View", groups: [6] },
+              { icon: "document", tip: "Document", groups: [7] }];
 const ALWAYS_SHOWN = new Set(["undo", "redo"]);
 const TIP_TIME = 1500;       // how long pressing a button shows its name on a touch screen
 const PINCH_HOLD = 200;      // ms: a second finger this soon after the first makes a pinch, even from a joint
 const ZOOM_STEP = -Math.log(0.9);  // scene.Camera.zoom multiplies the distance by 0.9 per step
-const AUTOSAVE_KEY = "stickman-pose";
+const AUTOSAVE_KEY = "stickman-pose", AUTOSAVE_DOCS_KEY = "stickman-documents";
 
 const $ = (id) => document.getElementById(id);
 const coarse = window.matchMedia("(pointer: coarse)").matches;  // a phone or tablet
@@ -97,10 +100,12 @@ async function start() {
   performance.mark("numpy loaded");
   const files = await (await fetch("py/files.json" + V)).json();
   py.FS.mkdirTree("/stickman");
+  py.FS.mkdirTree("/stickman/fonts");
   await Promise.all(files.map(async (name) => {
     const response = await fetch("py/" + name + V);
     if (!response.ok) throw new Error(`py/${name}: ${response.status}`);
-    py.FS.writeFile("/stickman/" + name, await response.text());
+    const binary = !name.endsWith(".py");  // the fonts (and their licence)
+    py.FS.writeFile("/stickman/" + name, binary ? new Uint8Array(await response.arrayBuffer()) : await response.text());
   }));
   py.runPython("import sys; sys.path.insert(0, '/stickman')");
   app = py.pyimport("bridge").app;
@@ -119,11 +124,12 @@ async function start() {
     ok.addEventListener("pointerdown", (e) => { if (e.button === 0) { e.preventDefault(); doAction("close_panel"); } });
     ok.addEventListener("click", (e) => { if (e.detail === 0) doAction("close_panel"); });  // keyboard
   }
+  setupComposer();
   resize();
   if (host) restorePose();
   $("loading").remove();
   performance.mark("ready");
-  window.stickman = { py, app };  // for testing from the browser console
+  window.stickman = { py, app, renderJob, toggleComposer };  // for testing from the browser console or Playwright
   requestAnimationFrame(tick);
 }
 
@@ -485,6 +491,11 @@ function doAction(action, shift = false) {
                           "PowerPoint", "Exported {}"); break;
     case "glb": saveFile(app.file_name() + ".glb", bytes(app.glb()), "model/gltf-binary", ".glb", tr("3D model (glTF)"), "Exported {}"); break;
     case "menu": openMenu(); break;
+    case "composer": toggleComposer(); break;
+    case "add_to_document":
+      app.action(action, shift);
+      refreshComposer();
+      break;
     default: app.action(action, shift);
   }
   dirty = true;
@@ -512,6 +523,7 @@ window.stickmanSaved = (name, ok) => say(tr(ok ? savedMessage : "Could not save 
 // The Android back button: true if it closed something on the page.
 window.stickmanBack = () => {
   if (menuOpen) closeMenu();
+  else if (composerOpen) toggleComposer(false);
   else if (lastFrame && (lastFrame.help || lastFrame.info.length)) doAction("close_panel");
   else return false;
   return true;
@@ -565,9 +577,12 @@ function copyFigure() {
     (error) => say(tr("Could not copy: {}").replace("{}", error.message || error)));
 }
 
+// A pose, a document, or a Word / PowerPoint / PDF file Stickman exported (it carries its document).
 function openPose(file) {
-  file.text().then((text) => {
-    app.open_pose(text, file.name);
+  file.arrayBuffer().then((data) => {
+    const kind = app.open_file(new Uint8Array(data), file.name);
+    if (kind === "doc") toggleComposer(true);
+    refreshComposer();
     dirty = true;
   });
 }
@@ -577,6 +592,9 @@ function autosavePose() {
   try {
     const text = app.autosave();
     if (text) localStorage.setItem(AUTOSAVE_KEY, text);
+    const docs = app.docs_autosave();
+    if (docs) localStorage.setItem(AUTOSAVE_DOCS_KEY, docs);
+    else localStorage.removeItem(AUTOSAVE_DOCS_KEY);
   } catch (error) {
     console.warn(error);
   }
@@ -586,6 +604,8 @@ function restorePose() {
   try {
     const text = localStorage.getItem(AUTOSAVE_KEY);
     if (text) app.restore(text);
+    const docs = localStorage.getItem(AUTOSAVE_DOCS_KEY);
+    if (docs) app.docs_restore(docs);
   } catch (error) {
     console.warn(error);
   }
@@ -1040,4 +1060,395 @@ function keyAction(e) {
   }
   if (c === "Tab" && shift) return null;
   return KEYS[c] || null;
+}
+
+// --- the Document Composer (composer.py; the actions are composer_actions.py) ------------------------
+
+let composerOpen = false, composerData = null, previewZoom = 1, pageShown = 0, composerSettingsOpen = false;
+const previewUrls = new Map();  // render_jobs key -> object URL of the preview picture
+const MM_PER_PT = 25.4 / 72;
+const el = (tag, props = {}, ...children) => {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+};
+
+function setupComposer() {
+  // The captions' font (ttf.py), so the preview wraps and looks as the exports do.
+  const font = (weight, file) => new FontFace("Stickman Sans", `url(py/fonts/${file}${V})`, { weight });
+  for (const face of [font("normal", "StickmanSans-Regular.ttf"), font("bold", "StickmanSans-Bold.ttf")]) {
+    face.load().then((f) => document.fonts.add(f)).catch(console.warn);
+  }
+  new ResizeObserver(() => { if (composerOpen) drawPages(); }).observe($("composer"));
+}
+
+function toggleComposer(open = !composerOpen) {
+  composerOpen = open;
+  $("composer").hidden = !open;
+  document.body.classList.toggle("composing", open);
+  for (const b of toolButtons) if (b.item.action === "composer") b.classList.toggle("active", open);
+  if (open) refreshComposer();
+}
+
+// After any change: read the state, rebuild the panel, then render the preview pictures it lacks.
+let refreshing = null;
+async function refreshComposer() {
+  if (!composerOpen) return;
+  composerData = JSON.parse(app.doc_summary());
+  buildComposer();
+  if (refreshing) return;
+  refreshing = (async () => {
+    for (;;) {
+      const jobs = JSON.parse(app.doc_jobs("preview", JSON.stringify([...previewUrls.keys()])));
+      if (!jobs.length) break;
+      for (const job of jobs) {
+        const image = renderJob(job);
+        const picture = el("canvas", { width: job.width, height: job.height });
+        picture.getContext("2d").putImageData(image, 0, 0);
+        const blob = await new Promise((resolve) => picture.toBlob(resolve, "image/png"));
+        previewUrls.set(job.key, URL.createObjectURL(blob));
+      }
+      drawPages();
+    }
+  })();
+  try { await refreshing; } finally { refreshing = null; }
+}
+
+function docAction(name, arg = null) {
+  const text = app.doc_action(name, JSON.stringify(arg));
+  if (text) say(text);
+  refreshComposer();
+  dirty = true;
+}
+
+// One of composer.render_jobs's pictures, drawn as the view draws (the same meshes and lights) into an
+// offscreen target: top-down RGBA with straight alpha.
+function renderJob(job) {
+  const w = job.width, h = job.height;
+  const target = new THREE.WebGLRenderTarget(w, h, { samples: 4 });
+  camera.projectionMatrix.fromArray(job.proj);
+  camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  camera.matrixWorldInverse.fromArray(job.view);
+  camera.matrixWorld.copy(camera.matrixWorldInverse).invert();
+  floor.visible = shadowGroup.visible = propShadowGroup.visible = job.ground && job.eye[1] > 0;
+  grid.visible = job.ground;
+  drawFigures(job.figures);
+  drawProps(job.props);
+  const background = scene.background;
+  scene.background = job.transparent ? null : color(C.background);
+  renderer.setClearColor(0x000000, 0);
+  renderer.setRenderTarget(target);
+  renderer.clear();
+  renderer.render(scene, camera);
+  const pixels = new Uint8Array(w * h * 4);
+  renderer.readRenderTargetPixels(target, 0, 0, w, h, pixels);
+  renderer.setRenderTarget(null);
+  target.dispose();
+  scene.background = background;
+  app.resend_props();  // the view's own equipment comes back with the next frame
+  dirty = true;
+  // Bottom-up rows, and edges averaged with the transparent clear colour: premultiplied alpha.
+  const out = new ImageData(w, h), d = out.data, row = w * 4;
+  for (let y = 0; y < h; y++) {
+    const from = (h - 1 - y) * row, to = y * row;
+    for (let x = 0; x < row; x += 4) {
+      const a = pixels[from + x + 3];
+      const k = a > 0 && a < 255 ? 255 / a : 1;
+      d[to + x] = pixels[from + x] * k;
+      d[to + x + 1] = pixels[from + x + 1] * k;
+      d[to + x + 2] = pixels[from + x + 2] * k;
+      d[to + x + 3] = a;
+    }
+  }
+  return out;
+}
+
+const DOC_TYPES = { docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    pdf: "application/pdf" };
+const DOC_NAMES = { docx: "Word", pptx: "PowerPoint", pdf: "PDF" };
+
+async function exportDocument() {
+  const doc = composerData && composerData.doc;
+  if (!doc || !doc.entries.length) { say(tr("Add a figure to the document first")); return; }
+  const fmt = doc.settings.format;
+  say(tr("Exporting..."));
+  await new Promise(requestAnimationFrame);
+  try {
+    for (const job of JSON.parse(app.doc_jobs(fmt))) {
+      app.doc_image(job.key, job.width, job.height, renderJob(job).data);
+      await new Promise(requestAnimationFrame);  // keep the page alive between pictures
+    }
+    const data = bytes(app.doc_export(fmt));
+    saveFile(app.doc_file_name() + "." + fmt, data, DOC_TYPES[fmt], "." + fmt, DOC_NAMES[fmt], "Exported {}");
+  } catch (error) {
+    console.error(error);
+    say(tr("Could not export: {}").replace("{}", error.message || error));
+  }
+}
+
+function saveDocument() {
+  if (!composerData || !composerData.doc) return;
+  saveFile(app.doc_file_name() + ".json", app.doc_json(), "application/json", ".json", tr("Stickman document"), "Saved {}");
+}
+
+// --- the panel ----------------------------------------------------------------------------
+
+function button(label, onClick, { title = "", disabled = false, cls = "" } = {}) {
+  const b = el("button", { type: "button", textContent: label, title, disabled, className: "cbutton " + cls });
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function selectBox(options, value, onChange) {
+  const s = el("select");
+  for (const [v, label] of options) s.append(el("option", { value: v, textContent: label, selected: v === value }));
+  s.addEventListener("change", () => onChange(s.value));
+  return s;
+}
+
+function check(label, value, onChange) {
+  const box = el("input", { type: "checkbox", checked: value });
+  box.addEventListener("change", () => onChange(box.checked));
+  return el("label", { className: "check" }, box, label);
+}
+
+function field(label, control) {
+  return el("label", { className: "field" }, el("span", { textContent: label }), control);
+}
+
+// A small picture of a grid: columns x rows on a page of the current orientation.
+function gridIcon(cols, rows, landscape) {
+  const icon = el("span", { className: "grid-icon" + (landscape ? " landscape" : "") });
+  icon.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  icon.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  for (let k = 0; k < cols * rows; k++) icon.append(el("span"));
+  return icon;
+}
+
+function buildComposer() {
+  const box = $("composer"), data = composerData, doc = data.doc;
+  const old = box.querySelector(".pages"), scroll = old ? old.scrollTop : 0;
+  box.replaceChildren();
+  const head = el("div", { className: "chead" });
+  if (data.docs.length) {
+    head.append(selectBox(data.docs.map((name, i) => [String(i), name]), String(data.current),
+                          (v) => docAction("choose", +v)));
+  }
+  head.append(button(tr("New"), () => docAction("new"), { title: tr("New document") }),
+              button(tr("Open"), () => $("file").click(), { title: tr("Open a document or a pose") }));
+  if (doc) {
+    head.append(button(tr("Save"), saveDocument, { title: tr("Save the document to edit it later") }),
+                button(tr("Close"), () => docAction("close"), { title: tr("Close this document") }),
+                button(tr("Export"), exportDocument, { title: tr("Export the document as the chosen format"), cls: "primary" }));
+  }
+  head.append(button("×", () => toggleComposer(false), { title: tr("Hide the composer (V)"), cls: "close" }));
+  box.append(el("div", { className: "ctitle", textContent: tr("Document Composer") }), head);
+  if (!doc) {
+    box.append(el("p", { className: "hint",
+      textContent: tr("No document yet. Press New, or add a figure with Add to Document (N): a document is made for it.") }));
+    return;
+  }
+  const s = doc.settings;
+  const settings = el("details", { className: "csection", open: !doc.entries.length || composerSettingsOpen });
+  settings.addEventListener("toggle", () => { composerSettingsOpen = settings.open; });
+  settings.append(el("summary", { textContent: tr("Document settings") }));
+  const grid = el("div", { className: "cgrid" });
+  settings.append(grid);
+  const name = el("input", { type: "text", value: doc.name });
+  name.addEventListener("change", () => docAction("rename", name.value));
+  const margin = el("input", { type: "number", min: 5, max: 40, step: 1, value: s.margin });
+  margin.addEventListener("change", () => docAction("set", ["margin", +margin.value]));
+  grid.append(
+    field(tr("Name"), name),
+    field(tr("Format"), selectBox(data.formats, s.format, (v) => docAction("set", ["format", v]))),
+    field(tr("Page"), selectBox([["portrait", tr("A4 portrait")], ["landscape", tr("A4 landscape")]], s.orientation,
+                                (v) => docAction("set", ["orientation", v]))),
+    field(tr("Margins (mm)"), margin),
+    field(tr("Figures go in as"), selectBox(data.modes, s.mode, (v) => docAction("set", ["mode", v]))),
+    el("div", { className: "checks" },
+       check(tr("Floor in images"), s.ground, (v) => docAction("set", ["ground", v])),
+       check(tr("Transparent background"), s.transparent, (v) => docAction("set", ["transparent", v]))),
+    el("div", { className: "checks" },
+       check(tr("Numbers"), s.numbers, (v) => docAction("set", ["numbers", v])),
+       check(tr("Names"), s.names, (v) => docAction("set", ["names", v])),
+       check(tr("Descriptions"), s.descriptions, (v) => docAction("set", ["descriptions", v]))));
+  const layouts = el("div", { className: "layouts" });
+  for (const [c, r] of data.layouts) {
+    const b = el("button", { type: "button", className: "layout" + (c === s.columns && r === s.rows ? " active" : ""),
+                             title: tr("{} figures per page").replace("{}", c * r) },
+                 gridIcon(c, r, s.orientation === "landscape"), el("span", { textContent: `${c}×${r}` }));
+    b.addEventListener("click", () => docAction("layout", [c, r]));
+    layouts.append(b);
+  }
+  grid.append(el("div", { className: "field wide" }, el("span", { textContent: tr("Grid (columns × rows)") }), layouts));
+  box.append(settings);
+
+  if (!doc.entries.length) {
+    box.append(el("p", { className: "hint", textContent: tr("Choose an exercise or pose a figure, then press Add to Document (N).") }));
+  }
+
+  const bar = el("div", { className: "cbar" },
+    button("−", () => { previewZoom = Math.max(0.3, previewZoom / 1.25); drawPages(); }, { title: tr("Zoom out") }),
+    el("span", { className: "zoom" }),
+    button("+", () => { previewZoom = Math.min(4, previewZoom * 1.25); drawPages(); }, { title: tr("Zoom in") }),
+    button("◀", () => showPage(pageShown - 1), { title: tr("Previous page") }),
+    el("span", { className: "pageno" }),
+    button("▶", () => showPage(pageShown + 1), { title: tr("Next page") }),
+    button("↶", () => docAction("undo"), { title: tr("Undo in the document"), disabled: !doc.can_undo }),
+    button("↷", () => docAction("redo"), { title: tr("Redo in the document"), disabled: !doc.can_redo }));
+  box.append(bar, el("div", { className: "pages" }));
+  if (doc.selected !== null && doc.entries[doc.selected]) box.append(entryPanel(doc, data));
+  drawPages();
+  box.querySelector(".pages").scrollTop = scroll;
+}
+
+function entryPanel(doc, data) {
+  const i = doc.selected, e = doc.entries[i];
+  const panel = el("div", { className: "csection entry" });
+  panel.append(el("div", { className: "entry-title",
+    textContent: tr("Figure {}").replace("{}", i + 1) + " · " + tr("page {}").replace("{}", e.page) }));
+  const name = el("input", { type: "text", value: e.name, placeholder: tr("Caption") });
+  name.addEventListener("change", () => docAction("entry", ["name", name.value]));
+  const description = el("textarea", { rows: 2, value: e.description, placeholder: tr("Short description or instruction") });
+  description.addEventListener("change", () => docAction("entry", ["description", description.value]));
+  const modeName = Object.fromEntries(data.modes);
+  const modes = [["", tr("Document's choice ({})").replace("{}", modeName[doc.settings.mode])], ...data.modes];
+  const grounds = [["", tr("Document's choice ({})").replace("{}", tr(doc.settings.ground ? "on" : "off"))],
+                   ["on", tr("on")], ["off", tr("off")]];
+  panel.append(
+    field(tr("Name"), name), field(tr("Description"), description),
+    field(tr("Goes in as"), selectBox(modes, e.mode || "", (v) => docAction("entry", ["mode", v || null]))),
+    field(tr("Floor"), selectBox(grounds, e.ground === null ? "" : e.ground ? "on" : "off",
+                                 (v) => docAction("entry", ["ground", v === "" ? null : v === "on"]))));
+  const last = doc.entries.length - 1, cap = doc.capacity;
+  panel.append(el("div", { className: "buttons" },
+    button("↑", () => docAction("step", -1), { title: tr("Move earlier"), disabled: i === 0 }),
+    button("↓", () => docAction("step", 1), { title: tr("Move later"), disabled: i === last }),
+    button("⇞", () => docAction("page", -1), { title: tr("Move to the page before"), disabled: i < cap }),
+    button("⇟", () => docAction("page", 1), { title: tr("Move to the page after"),
+                                              disabled: Math.floor(i / cap) === Math.floor(last / cap) }),
+    button(tr("Duplicate"), () => docAction("duplicate")),
+    button(tr("Delete"), () => docAction("delete"), { cls: "danger" })));
+  panel.append(el("div", { className: "buttons" },
+    button(tr("Edit in Stickman"), () => { docAction("edit"); if (coarse) toggleComposer(false); },
+           { title: tr("Load this figure into the editor; then Replace puts the changes back") }),
+    button(tr("Replace with the editor's pose"), () => docAction("replace"),
+           { title: tr("Put the pose now in the editor into this figure, keeping its caption and settings") })));
+  return panel;
+}
+
+function showPage(k) {
+  const pages = $("composer").querySelectorAll(".page");
+  if (!pages.length) return;
+  pageShown = Math.max(0, Math.min(pages.length - 1, k));
+  pages[pageShown].scrollIntoView({ block: "start", behavior: "smooth" });
+  updatePageNo();
+}
+
+function updatePageNo() {
+  const no = $("composer").querySelector(".pageno");
+  if (no && composerData.doc) {
+    no.textContent = tr("Page {} of {}").replace("{}", pageShown + 1).replace("{}", composerData.doc.pages.length);
+  }
+}
+
+// The pages as the exports lay them out: composer.layout geometry in mm, scaled to the panel.
+function drawPages() {
+  const holder = $("composer").querySelector(".pages");
+  if (!holder || !composerData || !composerData.doc) return;
+  const doc = composerData.doc, [pw, ph] = doc.page, [mx, my, mw, mh] = doc.content;
+  const zoom = $("composer").querySelector(".zoom");
+  if (zoom) zoom.textContent = Math.round(previewZoom * 100) + "%";
+  const fit = Math.min(holder.clientWidth - 28, (holder.clientHeight - 30) * pw / ph * 1.6);
+  const scale = Math.max(100, fit * previewZoom) / pw;
+  const mm = (v) => `${(v * scale).toFixed(2)}px`;
+  pageShown = Math.min(pageShown, doc.pages.length - 1);
+  holder.replaceChildren();
+  doc.pages.forEach((cells, p) => {
+    const page = el("div", { className: "page" });
+    page.dataset.page = p;
+    Object.assign(page.style, { width: mm(pw), height: mm(ph) });
+    const margin = el("div", { className: "margin" });
+    Object.assign(margin.style, { left: mm(mx), top: mm(my), width: mm(mw), height: mm(mh) });
+    page.append(margin);
+    for (const c of cells) {
+      const [cx, cy, cw, ch] = c.cell, [x, y, w, h] = c.figure;
+      const figure = el("div", { className: "figure" + (c.entry === doc.selected ? " selected" : "") });
+      Object.assign(figure.style, { left: mm(cx), top: mm(cy), width: mm(cw), height: mm(ch) });
+      figure.dataset.entry = c.entry;
+      const url = previewUrls.get(c.key);
+      if (url) {
+        const img = el("img", { src: url, alt: "", draggable: false });
+        Object.assign(img.style, { left: mm(x - cx), top: mm(y - cy), width: mm(w), height: mm(h) });
+        figure.append(img);
+      }
+      if (c.mode !== "image") figure.append(el("span", { className: "badge", textContent: c.mode === "model" ? "3D" : "2D" }));
+      for (const line of c.lines) {
+        const div = el("div", { className: "line" + (line.bold ? " bold" : ""), textContent: line.text });
+        Object.assign(div.style, { left: mm(line.x - cx), top: mm(line.top - cy), width: mm(line.width),
+                                   height: mm(line.height), lineHeight: mm(line.height),
+                                   fontSize: mm(line.size * MM_PER_PT) });
+        figure.append(div);
+      }
+      page.append(figure);
+    }
+    holder.append(el("div", { className: "pagelabel",
+      textContent: tr("Page {} of {}").replace("{}", p + 1).replace("{}", doc.pages.length) }), page);
+  });
+  holder.onscroll = () => {
+    const top = holder.getBoundingClientRect().top;
+    const k = [...holder.querySelectorAll(".page")].findIndex((pg) => pg.getBoundingClientRect().bottom > top + 40);
+    if (k >= 0 && k !== pageShown) { pageShown = k; updatePageNo(); }
+  };
+  holder.onpointerdown = previewPress;
+  updatePageNo();
+}
+
+// Click a figure to select it; drag it (mouse or pen) onto another place, on any page, to move it there.
+function previewPress(e) {
+  const figure = e.target.closest(".figure");
+  if (!figure || e.button !== 0) return;
+  const from = +figure.dataset.entry;
+  if (from !== composerData.doc.selected) docAction("select", from);
+  if (e.pointerType === "touch") return;  // touch screens move figures with the buttons
+  e.preventDefault();
+  const start = { x: e.clientX, y: e.clientY };
+  let ghost = null;
+  const move = (ev) => {
+    if (!ghost && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 6) return;
+    if (!ghost) {
+      const f = $("composer").querySelector(`.figure[data-entry="${from}"]`);
+      ghost = f ? f.cloneNode(true) : el("div");
+      ghost.className = "figure ghost";
+      document.body.append(ghost);
+    }
+    ghost.style.left = ev.clientX + 8 + "px";
+    ghost.style.top = ev.clientY + 8 + "px";
+  };
+  const up = (ev) => {
+    window.removeEventListener("pointermove", move);
+    window.removeEventListener("pointerup", up);
+    if (!ghost) return;
+    ghost.remove();
+    const to = dropIndex(ev.clientX, ev.clientY);
+    if (to !== null && to !== from) docAction("move", to);
+  };
+  window.addEventListener("pointermove", move);
+  window.addEventListener("pointerup", up);
+}
+
+// The place in the order under a point of the preview: the grid slot it falls in, on whichever page.
+function dropIndex(x, y) {
+  const doc = composerData.doc;
+  for (const page of $("composer").querySelectorAll(".page")) {
+    const r = page.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+    const [mx, my, mw, mh] = doc.content, scale = r.width / doc.page[0];
+    const cols = doc.settings.columns, rows = doc.settings.rows;
+    const col = Math.max(0, Math.min(cols - 1, Math.floor(((x - r.left) / scale - mx) / (mw / cols))));
+    const row = Math.max(0, Math.min(rows - 1, Math.floor(((y - r.top) / scale - my) / (mh / rows))));
+    return Math.min(doc.entries.length - 1, +page.dataset.page * doc.capacity + row * cols + col);
+  }
+  return null;
 }

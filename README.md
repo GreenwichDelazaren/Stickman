@@ -66,6 +66,8 @@ drag moves; holding Ctrl or Shift while dragging overrides that choice.
 | Ctrl+C | Copy the figure as editable shapes, for pasting into Word or PowerPoint (Windows) |
 | Ctrl+Shift+C | Copy the figure as a 3D model, for pasting into Word or PowerPoint (Windows) |
 | Ctrl+Shift+E | Export a 3D model file (`.glb`) |
+| N | Add the figure(s) to the current document (see Documents below) |
+| V | Show / hide the Document Composer |
 | T | Switch language: Greek / English (the flag button) |
 | I | Show / hide what Stickman is and how it came about (the i button, first on the toolbar). The OK button closes this box or the help |
 
@@ -125,6 +127,92 @@ Ctrl+Shift+E saves the same model as a `.glb` file, upright and facing the
 front, for Insert → 3D Models → This Device in Office or for other 3D
 programs.
 
+## Documents
+
+The Document Composer puts figures together on A4 pages and exports them as a
+Word (`.docx`), PowerPoint (`.pptx`) or PDF file: exercise sheets, workout
+programmes, handouts.
+
+1. Choose an exercise or pose a figure, and press **Add to Document** (N, the
+   page-with-a-plus button). The figure goes into the next place of the
+   current document, exactly as it is seen: pose, equipment and camera angle.
+   It is a copy, so editing the figure afterwards doesn't change the document.
+   The first time, a document is made for it.
+2. Repeat for every figure. The same figure can go in more than once.
+3. Open the **Document Composer** (V, the page-with-a-grid button) to arrange,
+   preview and export. It stays open while you go on posing: on the desktop
+   it is a window of its own, on the website a panel at the right (the whole
+   screen on a phone).
+
+In the composer:
+
+- **Document settings**: the format to export, A4 portrait or landscape, the
+  margins, the grid (1×1 to 4×4, and 1×3, 3×1, 2×5, 3×5; each button shows
+  its grid), how figures go in by default, the floor and a transparent
+  background for images, and which captions to show (number, name,
+  description). Change the grid at any time: the figures flow into it in
+  order, and pages are added or removed as needed.
+- **The pages** show the document as it will export: the margins, the grid,
+  every figure and its caption, page by page. Zoom with − / +, step through
+  pages with ◀ ▶. Click a figure to select it; drag it onto another place (on
+  any page) to move it there. The others close up in order, left to right and
+  top to bottom.
+- **The selected figure**: its caption name (the exercise's name to start
+  with) and a short description, how it goes in and whether images show the
+  floor (or follow the document), ↑ ↓ to move it one place, ⇞ ⇟ to move it to
+  the page before or after (these buttons are how to move figures on a touch
+  screen), Duplicate, Delete, **Edit in Stickman** (loads the figure into the
+  editor) and **Replace with the editor's pose** (puts what is in the editor
+  into this figure, keeping its caption and settings). Edit, change the pose,
+  Replace: the figure is updated in place.
+- **New / Open / Save / Close / Export**. Several documents can be open; the
+  list at the top chooses the one Add to Document fills. Save keeps the
+  document (a `.json` file with every figure's pose, the settings and the
+  captions) to go on editing later, on any of the three versions. Export
+  writes the Word, PowerPoint or PDF file. Every exported file also carries
+  its document, so opening a `.docx`, `.pptx` or `.pdf` that Stickman made
+  (Ctrl+O, or Open in the composer) brings the document back for editing.
+  Ctrl+Z / Ctrl+Y (↶ ↷) undo and redo changes to the document.
+
+### How a figure goes in
+
+Each figure can go in one of three ways (the document's choice, or its own):
+
+| | Word (.docx) | PowerPoint (.pptx) | PDF |
+|---|---|---|---|
+| **Image** | Picture | Picture | Picture |
+| **Editable 2D shapes** | Drawing group of native shapes | Group of native shapes | Vector drawing |
+| **3D model** | 3D model | 3D model | Picture, with the `.glb` attached |
+
+- **Image**: a 300 dpi picture of the 3D view, sharp when printed at its size
+  on the page, with or without the floor, its grid and the shadows, and with a
+  transparent or a coloured background.
+- **Editable 2D shapes**: every bone is a line, every joint a circle, the
+  eyes, nose and equipment are shapes, each named ("Left upper arm", "Left
+  elbow", "Bar", ...), in one group. In Word and PowerPoint, ungroup it or
+  click into it to recolour, move or delete single parts, as with Ctrl+C. In
+  a PDF it is vector drawing: sharp at any zoom, and editable in vector
+  programs (Illustrator, Inkscape, Acrobat's Edit PDF). The floor isn't
+  drawn in this mode.
+- **3D model**: Word and PowerPoint (Microsoft 365, Office 2019 and later)
+  get a real 3D model. Drag its round arrow to turn it and look at the pose
+  from any side; move and resize it like a picture. Turning the model is not
+  editing the pose: the joints can't be moved in Office. To change the pose,
+  edit the figure in Stickman (Edit in Stickman, then Replace) and export
+  again. Older Office versions and other programs show the picture that comes
+  with the model. PDF readers can't be relied on to show 3D (only Adobe
+  Acrobat ever did, with formats it has since dropped), so a PDF gets the
+  picture, and the model is attached to the PDF as a `.glb` file (the
+  paper-clip panel of a PDF reader) for Office or a 3D viewer.
+
+In every case the figure's pose stays in the saved document (and in the
+exported file's copy of it), so it can be reopened and edited in Stickman.
+
+Captions are set in Arial in Word and PowerPoint, and in Stickman Sans (the
+same letter widths) in the PDF and the preview, so they wrap the same
+everywhere. In Word the page is a table per page, one cell per figure; in
+PowerPoint every page is an A4 slide; the captions are text you can edit.
+
 ## Website
 
 The `web/` folder turns the app into a website that needs no installation:
@@ -143,7 +231,9 @@ Python runtime (Pyodide) and 3D library (Three.js) from the jsDelivr CDN, so
 the first visit downloads roughly 10–15 MB, which the browser then caches.
 
 The website has the same toolbar, keys, help (H), info (I) and languages as the app, and
-saves and opens the same pose files. Copying to Office works differently,
+saves and opens the same pose files. It has the Document Composer too (N, V), as a
+panel at the right, with the same documents, preview and exports; Export opens the
+browser's save dialog or downloads the file. Copying to Office works differently,
 because a web page can only put pictures on the clipboard, not Office shapes
 or 3D models:
 
@@ -159,7 +249,7 @@ one (Chrome, Edge) and download the file otherwise. The SVG copy needs a
 recent Chrome or Edge; other browsers copy the PNG only.
 
 On a phone or tablet the toolbar becomes a row of tabs (File, Edit, Drag,
-Joint, Figure, View) with bigger buttons under the open one; undo and redo stay
+Joint, Figure, View, Document) with bigger buttons under the open one; undo and redo stay
 visible. Pressing a button shows its name.
 
 | Touch | Action |
@@ -169,6 +259,8 @@ visible. Pressing a button shows its name.
 | Two fingers | Pinch to zoom, move to pan |
 | The arrows beside the exercise list | Previous / next exercise |
 | Hold a button | Repeat it |
+| Document tab | Add the figure to the document; open the Document Composer (full screen; × or the back button closes it) |
+| Tap a figure in the composer | Select it; ↑ ↓ ⇞ ⇟ move it |
 
 Ctrl and Shift while dragging are the three Drag buttons here. The smaller
 Shift-click steps (5°, 1 cm) aren't available by touch.
@@ -197,8 +289,10 @@ It works like the website on a phone, except:
 - Save and the exports open Android's save dialog.
 - The copy button shares the figure as a PNG through Android's share sheet.
   For shapes you can edit in Office, export the `.pptx`.
-- The pose is kept when Android closes the app in the background.
-- The back button closes an open list or box, then leaves the app.
+- The pose and the open documents are kept when Android closes the app in
+  the background.
+- The back button closes an open list, box or the Document Composer, then
+  leaves the app.
 
 ## How dragging works
 

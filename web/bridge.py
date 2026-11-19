@@ -11,6 +11,8 @@ import re
 
 import numpy as np
 
+import composer
+import doc_export
 import gltf
 import i18n
 import office_clip
@@ -49,6 +51,7 @@ HELP = [
     "Ctrl+C copy as a picture (Office: right-click > Convert to Shape)",
     "Ctrl+Shift+S download editable shapes (.pptx)",
     "Ctrl+Shift+E export 3D model (.glb)",
+    "N  add the figure to the document   V  Document Composer (arrange, export)",
     "T  language: Greek / English (the flag button)",
     "I  about Stickman (the i button)",
     "Hold a key or toolbar button to repeat it",
@@ -76,6 +79,7 @@ HELP_GREEK = [
     "Ctrl+C αντιγραφή ως εικόνα (Office: δεξί κλικ > Μετατροπή σε σχήμα)",
     "Ctrl+Shift+S λήψη ως επεξεργάσιμα σχήματα (.pptx)",
     "Ctrl+Shift+E εξαγωγή τρισδιάστατου μοντέλου (.glb)",
+    "N  προσθήκη της φιγούρας στο έγγραφο   V  Σύνθεση εγγράφου (διάταξη, εξαγωγή)",
     "T  γλώσσα: Ελληνικά / English (το κουμπί με τη σημαία)",
     "I  σχετικά με το Stickman (το κουμπί i)",
     "Κρατήστε πατημένο ένα πλήκτρο ή κουμπί για επανάληψη",
@@ -96,6 +100,7 @@ HELP_TOUCH = [
     "Joint (tap a joint first): pin, mirror, twist",
     "Figure: raise, lower, turn, tip, lean",
     "View: front, side, top, angled, centre, zoom, floor, this help",
+    "Document: add the figure to the document, open the Document Composer",
     "Hold a button to repeat it",
     "Colours: blue = left, red = right, green = pinned",
 ]
@@ -112,6 +117,7 @@ HELP_TOUCH_GREEK = [
     "Άρθρωση (πατήστε πρώτα μια άρθρωση): καρφίτσωμα, αντιγραφή πλευράς, περιστροφή",
     "Φιγούρα: ανύψωση, χαμήλωμα, στροφή, κλίση",
     "Προβολή: πρόσοψη, πλάγια, κάτοψη, υπό γωνία, κεντράρισμα, ζουμ, δάπεδο, αυτή η βοήθεια",
+    "Έγγραφο: προσθήκη της φιγούρας στο έγγραφο, σύνθεση εγγράφου",
     "Κρατήστε πατημένο ένα κουμπί για επανάληψη",
     "Χρώματα: μπλε = αριστερά, κόκκινο = δεξιά, πράσινο = καρφιτσωμένο",
 ]
@@ -149,6 +155,8 @@ class Editor:
         self.message = ""               # for app.js to show, taken by frame()
         self.tattoo = scene.Tattoo(1, 1, b"")
         self.touch = False              # a touch screen: help and messages without keys
+        self.composer = composer.Composer()  # the documents being put together
+        self.images = {}                # export pictures app.js rendered: render_jobs key -> RGBA
         self.update_view()
 
     # --- view ----------------------------------------------------------------
@@ -401,6 +409,8 @@ class Editor:
             self.camera.target = (lo + hi) / 2
         elif name in ZOOM:
             self.camera.zoom(ZOOM[name])
+        elif name == "add_to_document":
+            self.say(composer_action(self, "add"))
         self.update_view()
 
     # --- files and exports ---------------------------------------------------------
@@ -445,6 +455,80 @@ class Editor:
 
     def glb(self):
         return gltf.build_glb(scene.model_parts(self.figures, self.props, self.tattoo))
+
+
+    # --- the Document Composer -------------------------------------------------------
+
+    def doc_summary(self):
+        """JSON for app.js's composer: the open documents and the current one (composer.summary)."""
+        out = {"docs": [d.name for d in self.composer.docs], "current": self.composer.current,
+               "layouts": composer.LAYOUTS,
+               "formats": [[f, tr(composer.FORMAT_NAMES[f])] for f in composer.FORMATS],
+               "modes": [[m, tr(composer.MODE_NAMES[m])] for m in composer.MODES]}
+        if self.composer.doc is not None:
+            out["doc"] = composer.summary(self.composer.doc)
+        return json.dumps(out)
+
+    def doc_action(self, name, arg="null"):
+        """A composer button or field: its name and a JSON argument. Returns a message ("" for none)."""
+        return composer_action(self, name, json.loads(arg))
+
+    def _job(self, job):
+        return {"key": job["key"], "width": job["width"], "height": job["height"],
+                "proj": _flat(job["proj"].T), "view": _flat(job["view"].T), "eye": _flat(job["eye"]),
+                "ground": job["ground"], "transparent": job["transparent"],
+                "figures": [self._figure(f, True) for f in job["figures"]],
+                "props": [{"positions": _flat(p), "normals": _flat(n), "triangles": t.ravel().tolist()}
+                          for p, n, t in map(props.mesh, job["parts"])]}
+
+    def doc_jobs(self, purpose, skip="[]"):
+        """JSON of the pictures to render for "preview" or an export format, leaving out the keys in skip."""
+        if self.composer.doc is None:
+            return "[]"
+        skip = set(json.loads(skip))
+        return json.dumps([self._job(j) for j in composer.render_jobs(self.composer.doc, purpose)
+                           if j["key"] not in skip])
+
+    def doc_image(self, key, width, height, data):
+        """A rendered export picture: top-down RGBA with straight alpha."""
+        raw = data.to_py() if hasattr(data, "to_py") else data
+        self.images[key] = composer.finish_pixels(raw, int(width), int(height), False, False)
+
+    def doc_export(self, fmt):
+        try:
+            return doc_export.export(self.composer.doc, fmt, self.images, self.tattoo)
+        finally:
+            self.images = {}
+
+    def doc_file_name(self):
+        doc = self.composer.doc
+        name = re.sub(r'[\\/:*?"<>|]+', "", doc.name).strip() if doc else ""
+        return name or "document"
+
+    def doc_json(self):
+        self.composer.doc.modified = False
+        return self.composer.doc.to_json()
+
+    def docs_autosave(self):
+        """The open documents, for app.js to keep in case Android closes the app ("" if there are none)."""
+        if not self.composer.docs:
+            return ""
+        return json.dumps({"current": self.composer.current, "docs": [d.to_dict() for d in self.composer.docs]})
+
+    def docs_restore(self, text):
+        try:
+            data = json.loads(text)
+            for d in data["docs"]:
+                self.composer.open(d, d.get("name"))
+            self.composer.choose(int(data.get("current") or 0))
+        except (ValueError, KeyError, TypeError, AttributeError, IndexError):
+            pass
+
+    def open_file(self, data, name):
+        """A file from Open: a pose, a document, or a file Stickman exported. Returns "pose", "doc" or ""."""
+        raw = bytes(data.to_py() if hasattr(data, "to_py") else data)
+        kind = open_any(self, raw, name)
+        return kind
 
     # --- drawing -------------------------------------------------------------------
 
@@ -492,6 +576,10 @@ class Editor:
                   "triangles": tris.ravel().tolist()}
         return {"joints": joints, "bones": bones, "face": face, "tattoo": tattoo}
 
+    def resend_props(self):
+        """After app.js drew something else (a document's picture), send the equipment again."""
+        self._props_sent = None
+
     def frame(self, clean=False):
         """JSON of everything app.js draws: camera matrices (column-major, for Three.js), the figures,
         the equipment (only when it changed), the status line and toolbar states. Clean is the look
@@ -531,5 +619,7 @@ class Editor:
                            "bone_radius": scene.BONE_RADIUS, "tattoo_text": scene.TATTOO_TEXT,
                            "tattoo_font": scene.TATTOO_FONT, "tattoo_pad": scene.TATTOO_PAD})
 
+
+from composer_actions import composer_action, open_any  # noqa: E402  (shared with main.py)
 
 app = Editor()

@@ -28,8 +28,16 @@ from OpenGL.GL import (
     glPushMatrix, glReadBuffer, glReadPixels, glRotatef, glScalef, glTexCoordPointer, glTexParameteri,
     glTranslatef, glVertex3f, glVertexPointer, glViewport, glWindowPos2i,
 )
+from OpenGL.GL import (  # offscreen pictures for the Document Composer
+    GL_COLOR_ATTACHMENT0, GL_DEPTH_ATTACHMENT, GL_DEPTH_COMPONENT24, GL_FRAMEBUFFER, GL_FRAMEBUFFER_COMPLETE,
+    GL_MAX_RENDERBUFFER_SIZE, GL_ONE, GL_RENDERBUFFER, GL_RGBA8, glBindFramebuffer, glBindRenderbuffer,
+    glBlendFuncSeparate, glCheckFramebufferStatus, glDeleteFramebuffers, glDeleteRenderbuffers,
+    glFramebufferRenderbuffer, glGenFramebuffers, glGenRenderbuffers, glGetIntegerv, glRenderbufferStorage,
+)
 from OpenGL.GLU import GLU_SMOOTH, gluBuild2DMipmaps, gluCylinder, gluNewQuadric, gluQuadricNormals, gluSphere
 
+import composer
+import doc_export
 import exercises as ex
 import gltf
 import i18n
@@ -38,6 +46,7 @@ import office_clip
 import props
 import scene
 import skeleton as sk
+from composer_actions import composer_action, open_any
 from i18n import tr
 from scene import (BACKGROUND, BONE_RADIUS, FACE, FLOOR_COLOR, FLOOR_HALF, GRID_COLOR, GRID_STEP, LIGHT_DIR,
                    SHADOW_COLOR, SIDE_COLORS, TATTOO_COLOR, TATTOO_FONT, TATTOO_PAD, TATTOO_TEXT, VIEW_ANGLES,
@@ -89,6 +98,7 @@ HELP = [
     "Ctrl+Z/Y undo/redo  Ctrl+S save  Ctrl+O open  Ctrl+E export PNG",
     "Ctrl+C copy as editable shapes  Ctrl+Shift+C copy as 3D model",
     "Ctrl+Shift+E export 3D model (.glb)",
+    "N  add the figure to the document   V  Document Composer (arrange, export)",
     "T  language: Greek / English (the flag button)",
     "I  about Stickman (the i button)",
     "Hold a key or toolbar button to repeat it",
@@ -115,6 +125,7 @@ HELP_GREEK = [
     "Ctrl+Z/Y αναίρεση/επανάληψη  Ctrl+S αποθήκευση  Ctrl+O άνοιγμα  Ctrl+E εξαγωγή PNG",
     "Ctrl+C αντιγραφή ως επεξεργάσιμα σχήματα  Ctrl+Shift+C ως τρισδιάστατο μοντέλο",
     "Ctrl+Shift+E εξαγωγή τρισδιάστατου μοντέλου (.glb)",
+    "N  προσθήκη της φιγούρας στο έγγραφο   V  Σύνθεση εγγράφου (διάταξη, εξαγωγή)",
     "T  γλώσσα: Ελληνικά / English (το κουμπί με τη σημαία)",
     "I  σχετικά με το Stickman (το κουμπί i)",
     "Κρατήστε πατημένο ένα πλήκτρο ή κουμπί για επανάληψη",
@@ -179,6 +190,8 @@ TOOLBAR = [
      ("zoom_out", "Zoom out (- or mouse wheel)", (pygame.K_MINUS, 0)),
      ("floor_grid", "Show / hide the floor and grid (B)", (pygame.K_b, 0)),
      ("help", "Show / hide the help (H)", (pygame.K_h, 0))],
+    [("add_to_document", "Add the figure to the document (N)", (pygame.K_n, 0)),
+     ("document", "Document Composer: arrange, preview and export (V)", (pygame.K_v, 0))],
     [("language", "Language: English. Switch to Greek (T)", (pygame.K_t, 0))],
 ]
 # The buttons to the right of the exercise list, as TOOLBAR items.
@@ -203,26 +216,37 @@ def gl_matrix(m):
     return np.ascontiguousarray(m.T, dtype=np.float32)
 
 
-def ask_file(save, title, extension, kind):
-    import tkinter as tk
+_tk = None  # the one Tk: the file dialogs and the Document Composer window
+
+
+def tk_root():
+    global _tk
+    if _tk is None:
+        import tkinter as tk
+        _tk = tk.Tk()
+        _tk.withdraw()
+        _tk.iconphoto(True, tk.PhotoImage(master=_tk, data=icons.app_icon_png(48)))
+    return _tk
+
+
+def ask_file(save, title, extension, kind, more=(), initialfile=""):
+    """A file dialog; more are other (kind, pattern) choices for opening."""
     from tkinter import filedialog
 
     os.makedirs(POSES_DIR, exist_ok=True)
-    root = tk.Tk()
-    root.withdraw()
-    window_icon = tk.PhotoImage(master=root, data=icons.app_icon_png(48))
-    root.iconphoto(True, window_icon)
+    root = tk_root()
     root.attributes("-topmost", True)
     try:
-        filetypes = [(tr(kind), "*" + extension), (tr("All files"), "*.*")]
+        filetypes = [(tr(kind), "*" + extension)] + [(tr(k), p) for k, p in more] + [(tr("All files"), "*.*")]
         if save:
             path = filedialog.asksaveasfilename(parent=root, title=tr(title), initialdir=POSES_DIR,
-                                                filetypes=filetypes, defaultextension=extension)
+                                                filetypes=filetypes, defaultextension=extension,
+                                                initialfile=initialfile)
         else:
             path = filedialog.askopenfilename(parent=root, title=tr(title), initialdir=POSES_DIR,
                                               filetypes=filetypes)
     finally:
-        root.destroy()
+        root.attributes("-topmost", False)
     return path or None
 
 
@@ -479,6 +503,11 @@ class App:
         self.tool_hover = self.tool_pressed = None
         self._tools = (None, [], pygame.Rect(0, 0, 1, 1), 0)  # (key, [(rect, item)], menu rect, height)
         self._tool_image = (None, (0, 0, b""))               # (cache key, (w, h, data))
+        self.composer = composer.Composer()  # the documents being put together
+        self.composer_window = None
+        self.previews = {}             # composer preview pictures: render_jobs key -> RGBA
+        self._preview_jobs = {}        # key -> job, of the current document
+        self._photos = {}              # (key, w, h) -> Tk PhotoImage shown in the composer window
         self.running = True
         self._update_matrices()
 
@@ -507,6 +536,8 @@ class App:
         glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, (0.25, 0.25, 0.25, 1.0))
         glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 40.0)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        # Alpha adds up as coverage, so a picture with a transparent background stays opaque where drawn.
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
         glPixelStorei(GL_PACK_ALIGNMENT, 1)
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
 
@@ -523,7 +554,14 @@ class App:
             self.repeat_held()
             self.render()
             pygame.display.flip()
+            if _tk is not None:
+                try:
+                    _tk.update()
+                except Exception as exc:  # a callback failed: say so and carry on
+                    self.say(str(exc))
             clock.tick(60)
+        if _tk is not None:
+            _tk.destroy()
         pygame.quit()
 
     def say(self, text):
@@ -734,6 +772,12 @@ class App:
         elif key == pygame.K_t:
             i18n.language = "en" if i18n.language == "el" else "el"
             self.say(tr("Language: English"))
+            if self.composer_window is not None:
+                self.composer_window.rebuild()
+        elif key == pygame.K_n:
+            self.composer_do("add")
+        elif key == pygame.K_v:
+            self.toggle_composer()
         elif key == pygame.K_TAB:
             self.held = None
             self.menu.open(self.exercise)
@@ -847,6 +891,7 @@ class App:
             return self.drag_mode == action
         return {(pygame.K_l, 0): self.skel.limits_on, (pygame.K_h, 0): self.show_help, (pygame.K_i, 0): self.show_info,
                 (pygame.K_b, 0): self.show_floor,
+                (pygame.K_v, 0): self.composer_window is not None and self.composer_window.visible,
                 (pygame.K_p, 0): self.selected in self.skel.pins}.get(action, False)
 
     def draw_toolbar(self):
@@ -890,17 +935,20 @@ class App:
             self.say(tr("Saved {}").format(os.path.basename(path)))
 
     def open_pose(self):
-        path = ask_file(False, "Open pose", ".json", "Pose")
+        """Open a pose, a document, or a Word / PowerPoint / PDF file Stickman exported (it carries its document)."""
+        path = ask_file(False, "Open pose", ".json", "Pose or document",
+                        more=[("Exported document", "*.docx *.pptx *.pdf")])
         self._after_dialog()
         if path:
             try:
-                with open(path, encoding="utf-8") as f:
-                    dicts, exercise, parts = scene.read_pose_file(json.load(f))
-            except (OSError, ValueError, KeyError, TypeError) as exc:
+                with open(path, "rb") as f:
+                    raw = f.read()
+            except OSError as exc:
                 self.say(tr("Could not open pose: {}").format(exc))
                 return
-            self.edit(self.load_figures, dicts, exercise, parts)
-            self.say(tr("Opened {}").format(os.path.basename(path)))
+            if open_any(self, raw, os.path.basename(path)) == "doc":
+                self.toggle_composer(True)
+            self.refresh_composer()
 
     def load_figures(self, dicts, exercise=None, parts=()):
         """Replace the figures with poses saved by Skeleton.to_dict, and the equipment with parts."""
@@ -968,34 +1016,167 @@ class App:
 
     # --- drawing -----------------------------------------------------------
 
-    def render(self, clean=False):
-        self._update_matrices()
-        w, h = self.size
+    def render(self, clean=False, job=None):
+        """Draw the view, or (job: one of composer.render_jobs) a document's picture at the job's
+        scale-up size into the bound framebuffer."""
+        if job is None:
+            self._update_matrices()
+            (w, h), proj, view, eye = self.size, self.proj, self.view, self.camera.eye()
+            figures, parts, floor, background = self.figures, self.props, self.show_floor, (*BACKGROUND, 1.0)
+        else:
+            w, h = job["pixels"]
+            proj, view, eye, figures, parts = job["proj"], job["view"], job["eye"], job["figures"], job["parts"]
+            floor, clean = job["ground"], True
+            background = (0.0, 0.0, 0.0, 0.0) if job["transparent"] else (*BACKGROUND, 1.0)
         glViewport(0, 0, w, h)
-        glClearColor(*BACKGROUND, 1.0)
+        glClearColor(*background)
         glClear(int(GL_COLOR_BUFFER_BIT) | int(GL_DEPTH_BUFFER_BIT))
         glMatrixMode(GL_PROJECTION)
-        glLoadMatrixf(gl_matrix(self.proj))
+        glLoadMatrixf(gl_matrix(proj))
         glMatrixMode(GL_MODELVIEW)
-        glLoadMatrixf(gl_matrix(self.view))
+        glLoadMatrixf(gl_matrix(view))
         glLightfv(GL_LIGHT0, GL_POSITION, (*LIGHT_DIR, 0.0))
 
-        above = self.camera.eye()[1] > 0
-        if self.show_floor:
+        above = eye[1] > 0
+        if floor:
             self.draw_floor(solid=above)
-        if above and self.show_floor:
+        if above and floor:
             glPushMatrix()
             glScalef(1.0, 0.0, 1.0)  # flatten onto the floor
             glColor3f(*SHADOW_COLOR)
-            for skel in self.figures:
+            for skel in figures:
                 self.draw_figure(skel, shadow=True)
-            self.draw_props(shadow=True)
+            self.draw_props(parts, shadow=True)
             glPopMatrix()
-        self.draw_props()
-        for skel in self.figures:
+        self.draw_props(parts)
+        for skel in figures:
             self.draw_figure(skel, clean=clean)
         if not clean:
             self.draw_hud()
+
+    def render_picture(self, job):
+        """A composer.render_jobs picture: top-down RGBA with straight alpha (numpy), drawn at twice the
+        size into an offscreen framebuffer and scaled down (the anti-aliasing)."""
+        w, h = job["width"], job["height"]
+        most = int(glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE))
+        factor = 2 if max(w, h) * 2 <= most else 1
+        pw, ph = w * factor, h * factor
+        fbo = glGenFramebuffers(1)
+        color, depth = glGenRenderbuffers(2)
+        try:
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo)
+            glBindRenderbuffer(GL_RENDERBUFFER, color)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, pw, ph)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color)
+            glBindRenderbuffer(GL_RENDERBUFFER, depth)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, pw, ph)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth)
+            if glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE:
+                raise OSError(tr("Could not draw the picture (OpenGL)"))
+            self.render(job=dict(job, pixels=(pw, ph)))
+            glFinish()
+            glReadBuffer(GL_COLOR_ATTACHMENT0)
+            data = cast(bytes, glReadPixels(0, 0, pw, ph, GL_RGBA, GL_UNSIGNED_BYTE))
+        finally:
+            glBindFramebuffer(GL_FRAMEBUFFER, 0)
+            glDeleteRenderbuffers(2, [color, depth])
+            glDeleteFramebuffers(1, [fbo])
+            glReadBuffer(GL_BACK)
+        # Bottom-up, and where the figure covers part of a pixel the clear colour (0, 0, 0, 0) is mixed in.
+        rgba = composer.finish_pixels(data, pw, ph, bottom_up=True, premultiplied=False)
+        return composer.downsample(rgba, factor) if factor > 1 else composer.finish_pixels(
+            rgba.tobytes(), pw, ph, bottom_up=False, premultiplied=True)
+
+    # --- the Document Composer ---------------------------------------------------
+
+    def toggle_composer(self, show=None):
+        from composer_window import ComposerWindow
+        if self.composer_window is None or not self.composer_window.win.winfo_exists():
+            self.composer_window = ComposerWindow(tk_root(), self)
+            return
+        show = not self.composer_window.visible if show is None else show
+        self.composer_window.show() if show else self.composer_window.hide()
+
+    def refresh_composer(self):
+        if self.composer_window is not None and self.composer_window.visible:
+            self.composer_window.refresh()
+
+    def composer_do(self, name, arg=None):
+        """A composer action (composer_actions), from the window or a key."""
+        message = composer_action(self, name, arg)
+        if message:
+            self.say(message)
+        self.refresh_composer()
+
+    def composer_summary(self):
+        doc = self.composer.doc
+        out = {"docs": [d.name for d in self.composer.docs], "current": self.composer.current}
+        if doc is not None:
+            out["doc"] = composer.summary(doc)
+            self._preview_jobs = {j["key"]: j for j in composer.render_jobs(doc, "preview")}
+        return out
+
+    def composer_photo(self, key, size):
+        """The preview picture of key at size (w, h) as a Tk image, rendered when first needed."""
+        if (key,) + size in self._photos:
+            return self._photos[(key,) + size]
+        if key not in self.previews:
+            job = self._preview_jobs.get(key)
+            if job is None:
+                return None
+            self.previews[key] = self.render_picture(job)
+        import base64
+        import tkinter as tk
+        rgba = self.previews[key]
+        surface = pygame.image.frombuffer(rgba.tobytes(), (rgba.shape[1], rgba.shape[0]), "RGBA")
+        surface = pygame.transform.smoothscale(surface, size)
+        png = io.BytesIO()
+        pygame.image.save(surface, png, "png")
+        photo = tk.PhotoImage(master=tk_root(), data=base64.b64encode(png.getvalue()))
+        self._photos[(key,) + size] = photo
+        return photo
+
+    def composer_keep(self, shown):
+        """Forget the Tk images no longer shown (zooming makes new ones)."""
+        self._photos = {k: v for k, v in self._photos.items() if k in shown}
+        if len(self.previews) > 300:
+            self.previews.clear()
+
+    def composer_open(self):
+        self.open_pose()
+
+    def composer_save(self):
+        doc = self.composer.doc
+        if doc is None:
+            return
+        path = ask_file(True, "Save document", ".json", "Stickman document", initialfile=doc.name)
+        self._after_dialog()
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(doc.to_json())
+            doc.modified = False
+            self.say(tr("Saved {}").format(os.path.basename(path)))
+
+    def composer_export(self):
+        doc = self.composer.doc
+        if doc is None or not doc.entries:
+            self.say(tr("Add a figure to the document first"))
+            return
+        fmt = doc.settings["format"]
+        kinds = {"docx": "Word document", "pptx": "PowerPoint presentation", "pdf": "PDF document"}
+        path = ask_file(True, "Export document", "." + fmt, kinds[fmt], initialfile=doc.name)
+        self._after_dialog()
+        if not path:
+            return
+        try:
+            images = {job["key"]: self.render_picture(job) for job in composer.render_jobs(doc, fmt)}
+            data = doc_export.export(doc, fmt, images, self.tattoo)
+            with open(path, "wb") as f:
+                f.write(data)
+        except (OSError, KeyError) as exc:
+            self.say(tr("Could not export: {}").format(exc))
+            return
+        self.say(tr("Exported {}").format(os.path.basename(path)))
 
     def draw_floor(self, solid):
         glDisable(GL_LIGHTING)
@@ -1097,11 +1278,11 @@ class App:
         glDisable(GL_BLEND)
         glDisable(GL_TEXTURE_2D)
 
-    def draw_props(self, shadow=False):
-        if self._prop_meshes[0] is not self.props:
-            self._prop_meshes = (self.props, [(positions.astype(np.float32), normals.astype(np.float32),
-                                               tris.astype(np.uint32))
-                                              for positions, normals, tris in map(props.mesh, self.props)])
+    def draw_props(self, parts, shadow=False):
+        if self._prop_meshes[0] is not parts:
+            self._prop_meshes = (parts, [(positions.astype(np.float32), normals.astype(np.float32),
+                                          tris.astype(np.uint32))
+                                         for positions, normals, tris in map(props.mesh, parts)])
         if not shadow:
             glEnable(GL_LIGHTING)
             glColor3f(*props.COLOR)

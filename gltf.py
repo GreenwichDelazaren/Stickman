@@ -56,8 +56,8 @@ def tube(a, b, radius, segments=TUBE_SEGMENTS):
     return positions, np.concatenate([ring, ring]), np.array(tris)
 
 
-def build_glb(parts, rotation=None):
-    """The parts as a binary glTF file (bytes), optionally rotated by a 3x3 matrix."""
+def build_glb(parts, rotation=None, offset=None):
+    """The parts as a binary glTF file (bytes), optionally rotated by a 3x3 matrix and then moved by offset."""
     blob = bytearray()
     views, accessors, meshes, nodes, materials, images = [], [], [], [], [], []
     material_of, image_of = {}, {}
@@ -89,6 +89,8 @@ def build_glb(parts, rotation=None):
             pos, nrm, tris = tube(part["a"], part["b"], part["radius"])
         if rotation is not None:
             pos, nrm = pos @ rotation.T, nrm @ rotation.T
+        if offset is not None:
+            pos = pos + np.asarray(offset, float)
         color = tuple(round(float(c) ** 2.2, 4) for c in part["color"])  # glTF colours are linear
         image = part.get("image")
         if image is not None and image not in image_of:

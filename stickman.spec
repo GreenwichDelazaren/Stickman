@@ -11,7 +11,7 @@ os.makedirs(workpath, exist_ok=True)
 icon_file = os.path.join(workpath, "stickman.ico")
 icons.write_ico(icon_file)
 
-analysis = Analysis(["main.py"])
+analysis = Analysis(["main.py"], datas=[("fonts/*.ttf", "fonts")])  # ttf.py: the Document Composer's font
 archive = PYZ(analysis.pure)
 exe = EXE(
     archive,

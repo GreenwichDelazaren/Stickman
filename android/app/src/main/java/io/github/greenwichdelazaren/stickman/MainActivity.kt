@@ -175,6 +175,7 @@ class MainActivity : ComponentActivity() {
             "html" to "text/html", "css" to "text/css", "js" to "text/javascript", "mjs" to "text/javascript",
             "json" to "application/json", "png" to "image/png", "wasm" to "application/wasm",
             "py" to "text/plain", "zip" to "application/zip", "whl" to "application/zip",
+            "ttf" to "font/ttf",  // the Document Composer's caption font
         )
     }
 }
