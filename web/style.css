@@ -245,7 +245,7 @@ html, body {
   background: rgba(25, 30, 38, 0.96); z-index: 3; overflow-y: auto; font-size: 14px;
 }
 #composer[hidden] { display: none; }
-#composer .ctitle { font-weight: bold; font-size: 16px; }
+#composer .ctitle { font-weight: bold; font-size: 16px; display: flex; align-items: center; gap: 6px; }
 #composer .chead, #composer .cbar, #composer .buttons, #composer .checks { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 #composer select, #composer input[type=text], #composer input[type=number], #composer textarea {
   background: var(--button); color: var(--text); border: 1px solid var(--hover); border-radius: 4px;

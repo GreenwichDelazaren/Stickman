@@ -1076,7 +1076,7 @@ function keyAction(e) {
 
 // --- the Document Composer (composer.py; the actions are composer_actions.py) ------------------------
 
-let composerOpen = false, composerData = null, previewZoom = 1, pageShown = 0, composerSettingsOpen = false;
+let composerOpen = false, composerData = null, previewZoom = 1, pageShown = 0, composerSettingsOpen = false, composerEntryOpen = true;
 const previewUrls = new Map();  // render_jobs key -> object URL of the preview picture
 const MM_PER_PT = 25.4 / 72;
 const el = (tag, props = {}, ...children) => {
@@ -1254,8 +1254,8 @@ function buildComposer() {
                 button(tr("Close"), () => docAction("close"), { title: tr("Close this document") }),
                 button(tr("Export"), exportDocument, { title: tr("Export the document as the chosen format"), cls: "primary" }));
   }
-  head.append(button("×", () => toggleComposer(false), { title: tr("Hide the composer (V)"), cls: "close" }));
-  box.append(el("div", { className: "ctitle", textContent: tr("Document Composer") }), head);
+  box.append(el("div", { className: "ctitle" }, el("span", { textContent: tr("Document Composer") }),
+                button("×", () => toggleComposer(false), { title: tr("Hide the composer (V)"), cls: "close" })), head);
   if (!doc) {
     box.append(el("p", { className: "hint",
       textContent: tr("No document yet. Press New, or add a figure with Add to Document (N): a document is made for it.") }));
@@ -1317,8 +1317,9 @@ function buildComposer() {
 
 function entryPanel(doc, data) {
   const i = doc.selected, e = doc.entries[i];
-  const panel = el("div", { className: "csection entry" });
-  panel.append(el("div", { className: "entry-title",
+  const panel = el("details", { className: "csection entry", open: composerEntryOpen });
+  panel.addEventListener("toggle", () => { composerEntryOpen = panel.open; });
+  panel.append(el("summary", { className: "entry-title",
     textContent: tr("Figure {}").replace("{}", i + 1) + " · " + tr("page {}").replace("{}", e.page) }));
   const name = el("input", { type: "text", value: e.name, placeholder: tr("Caption") });
   name.addEventListener("change", () => docAction("entry", ["name", name.value]));
