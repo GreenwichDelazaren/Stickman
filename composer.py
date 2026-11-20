@@ -53,6 +53,10 @@ PT = 25.4 / 72                           # millimetres per point
 LINE = 1.2                               # caption line height, times the font size
 CAPTION_GAP = 1.5                        # mm between a figure and its caption
 MAX_DESCRIPTION_LINES = 3
+FOOTER = 6.0                             # mm kept free under the grid for the attribution
+ATTRIBUTION_SIZE = 8.0                   # pt
+ATTRIBUTION_HEIGHT = 3.5                 # mm: its line, which ends 0.5 mm into the bottom margin
+ATTRIBUTION_COLOR = (0.4, 0.4, 0.4)
 OFFICE_UNIT = 36000000                   # Office's 3D models: the longest side of a model
 OFFICE_FOV = 45.0                        # ... and its camera's field of view
 
@@ -384,7 +388,7 @@ def layout(doc):
     s = doc.settings
     pw, ph = page_size(s)
     m = s["margin"]
-    cw, ch = pw - 2 * m, ph - 2 * m
+    cw, ch = pw - 2 * m, ph - 2 * m - FOOTER
     cols, rows = s["columns"], s["rows"]
     slot_w, slot_h = cw / cols, ch / rows
     pad = min(4.0, max(1.5, min(slot_w, slot_h) * 0.04))
@@ -440,8 +444,10 @@ def layout(doc):
             cells.append({"entry": n, "number": n + 1, "slot": (sx, sy, slot_w, slot_h),
                           "cell": (x, y, cell_w, cell_h), "figure": (x, y, cell_w, fig_h), "lines": lines})
         pages.append(cells)
+    attribution = {"text": scene.ATTRIBUTION, "x": m, "top": ph - m + 0.5 - ATTRIBUTION_HEIGHT, "width": cw,
+                   "height": ATTRIBUTION_HEIGHT, "size": ATTRIBUTION_SIZE, "bold": False}
     return {"page": (pw, ph), "content": (m, m, cw, ch), "pages": pages, "sizes": (name_pt, desc_pt),
-            "pad": pad}
+            "pad": pad, "attribution": attribution}
 
 
 # --- framing a figure in its rectangle ----------------------------------------------------
@@ -633,5 +639,5 @@ def summary(doc):
                        "slot": c["slot"], "lines": c["lines"], "key": cell_key(doc, c, "preview"),
                        "mode": doc.mode(doc.entries[c["entry"]])} for c in cells])
     return {"name": doc.name, "settings": doc.settings, "entries": entries, "selected": doc.selected,
-            "page": lay["page"], "content": lay["content"], "pages": pages,
+            "page": lay["page"], "content": lay["content"], "pages": pages, "attribution": lay["attribution"],
             "capacity": doc.capacity, "can_undo": bool(doc.undo_stack), "can_redo": bool(doc.redo_stack)}

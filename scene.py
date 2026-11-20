@@ -48,8 +48,9 @@ VERSION = "2.0"
 AUTHOR = "Lazaros Filippidis"
 CONTACT = "Lazaros.Filippidis@Gmail.com"
 ABOUT_TITLE = APP_NAME + " v" + VERSION + " · " + AUTHOR
-# The credit at the top left of every exported page (doc_export.py).
-CREDIT = [APP_NAME + " v" + VERSION + " - " + CONTACT]
+# The attribution at the bottom centre of every exported page (composer.layout, doc_export.py).
+# Never translated: it reads the same in every language and format.
+ATTRIBUTION = f"Created by {APP_NAME} v{VERSION} | {CONTACT}"
 HELP_TITLE = "Instructions"
 ABOUT = [
     "Quickly and easily create exercise illustrations by posing a 3D stick figure in different positions.",

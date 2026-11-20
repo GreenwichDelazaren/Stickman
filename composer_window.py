@@ -403,6 +403,10 @@ class ComposerWindow:
                     c.create_text(left + (line["x"] + line["width"] / 2) * scale,
                                   top + (line["top"] + line["height"] / 2) * scale, text=line["text"], fill="#1a1a1a",
                                   font=(family, -px, "bold" if line["bold"] else "normal"))
+            line = doc["attribution"]
+            c.create_text(left + (line["x"] + line["width"] / 2) * scale, top + (line["top"] + line["height"] / 2) * scale,
+                          text=line["text"], fill="#666666",
+                          font=(family, -max(1, round(line["size"] * composer.PT * scale))))
         total = self.page_top(len(doc["pages"])) + PAGE_GAP
         c.configure(scrollregion=(0, 0, max(c.winfo_width(), left * 2 + pw * scale), total))
         self.photos = {k: v for k, v in self.photos.items() if k in shown}

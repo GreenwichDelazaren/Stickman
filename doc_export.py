@@ -38,15 +38,29 @@ PT_PER_MM = 72 / 25.4
 DOCUMENT_PART = "stickman/document.json"
 DOCUMENT_REL = "urn:stickman:document"
 TEXT_COLOR = (0.1, 0.1, 0.1)
-CREDIT_COLOR = (0.45, 0.45, 0.45)
-CREDIT_SIZE = 7.0  # pt
-CREDIT_LINE = 3.0  # mm between baselines
-CREDIT_POS = (5.0, 3.0)  # mm from the page's top left corner, in the margin
+CREATOR = f"{scene.APP_NAME} v{scene.VERSION}"  # the files' metadata
 
 
-def _credit():
-    """The lines at the top left of every page: the program, its version, author and contact."""
-    return [tr(line) for line in scene.CREDIT]
+def _core_props():
+    """docProps/core.xml and app.xml: the author and the program that made the file."""
+    core = (f'{office_clip._XML}<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/'
+            'metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" '
+            'xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
+            f'<dc:creator>{escape(scene.CONTACT)}</dc:creator>'
+            f'<dc:description>{escape(scene.ATTRIBUTION)}</dc:description></cp:coreProperties>')
+    app = (f'{office_clip._XML}<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/'
+           f'extended-properties"><Application>{escape(CREATOR)}</Application></Properties>')
+    return core, app
+
+
+_PROPS_TYPES = [("/docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml"),
+                ("/docProps/app.xml", "application/vnd.openxmlformats-officedocument.extended-properties+xml")]
+
+
+def _write_props(z):
+    core, app = _core_props()
+    z.writestr("docProps/core.xml", core)
+    z.writestr("docProps/app.xml", app)
 SLACK = 3.0  # mm: the Word page is this much longer than the layout, for the paragraphs between tables
 MIME = {"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -192,7 +206,11 @@ def _types(overrides, media):
 def _package_rels(main):
     return (f'{office_clip._XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
             f'<Relationship Id="rId1" Type="{office_clip._REL}/officeDocument" Target="{main}"/>'
-            f'<Relationship Id="rId2" Type="{DOCUMENT_REL}" Target="{DOCUMENT_PART}"/></Relationships>')
+            f'<Relationship Id="rId2" Type="{DOCUMENT_REL}" Target="{DOCUMENT_PART}"/>'
+            '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/'
+            'core-properties" Target="docProps/core.xml"/>'
+            f'<Relationship Id="rId4" Type="{office_clip._REL}/extended-properties" Target="docProps/app.xml"/>'
+            '</Relationships>')
 
 
 def _cells(doc, lay):
@@ -333,29 +351,18 @@ def _w_group(shapes, rect, pid, name):
     return _inline(group, _emu(w), _emu(h), pid, name, "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup")
 
 
-def _w_credit(pid):
-    """The credit as a text box anchored to the page's top left corner (not in the flow, so the layout stays)."""
-    size = round(CREDIT_SIZE * 2)
-    color = office_clip._hex(CREDIT_COLOR)
-    paras = "".join(
-        f'<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="{_tw(CREDIT_LINE)}" w:lineRule="exact"/></w:pPr>'
-        f'<w:r><w:rPr><w:color w:val="{color}"/><w:sz w:val="{size}"/><w:szCs w:val="{size}"/></w:rPr>'
-        f'<w:t xml:space="preserve">{escape(line)}</w:t></w:r></w:p>' for line in _credit())
-    cx, cy = _mm_emu(120), _mm_emu(CREDIT_LINE * len(_credit()) + 1)
-    x, y = (_mm_emu(v) for v in CREDIT_POS)
-    shape = (f'<wps:wsp><wps:cNvSpPr txBox="1"/><wps:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/>'
-             f'</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></wps:spPr>'
-             f'<wps:txbx><w:txbxContent>{paras}</w:txbxContent></wps:txbx><wps:bodyPr rot="0" wrap="square" '
-             f'lIns="0" tIns="0" rIns="0" bIns="0" anchor="t"><a:noAutofit/></wps:bodyPr></wps:wsp>')
-    anchor = (f'<wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="{pid}" '
-              f'behindDoc="0" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/>'
-              f'<wp:positionH relativeFrom="page"><wp:posOffset>{x}</wp:posOffset></wp:positionH>'
-              f'<wp:positionV relativeFrom="page"><wp:posOffset>{y}</wp:posOffset></wp:positionV>'
-              f'<wp:extent cx="{cx}" cy="{cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/>'
-              f'<wp:docPr id="{pid}" name={quoteattr(tr("Credit"))}/><wp:cNvGraphicFramePr/><a:graphic>'
-              f'<a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingShape">{shape}'
-              f'</a:graphicData></a:graphic></wp:anchor>')
-    return _w_tiny(_w_run(f'<w:drawing>{anchor}</w:drawing>'))
+def _w_footer(line):
+    """The footer part: the attribution in a content control that can be neither deleted nor edited
+    (w:lock sdtContentLocked), centred and grey. No document protection, so all else stays editable."""
+    size = round(line["size"] * 2)
+    color = office_clip._hex(composer.ATTRIBUTION_COLOR)
+    para = (f'<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="0" w:after="0" '
+            f'w:line="{_tw(line["height"])}" w:lineRule="exact"/></w:pPr><w:r><w:rPr><w:color w:val="{color}"/>'
+            f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/></w:rPr>'
+            f'<w:t xml:space="preserve">{escape(line["text"])}</w:t></w:r></w:p>')
+    sdt = (f'<w:sdt><w:sdtPr><w:alias w:val="{escape(scene.APP_NAME)}"/><w:tag w:val="stickman-attribution"/>'
+           f'<w:id w:val="1"/><w:lock w:val="sdtContentLocked"/></w:sdtPr><w:sdtContent>{para}</w:sdtContent></w:sdt>')
+    return f'{office_clip._XML}<w:ftr {_W_NS}>{sdt}</w:ftr>'
 
 
 def _w_run(drawing):
@@ -435,7 +442,7 @@ def build_docx(doc, images, tattoo):
             trs.append(f'<w:tr><w:trPr><w:cantSplit/><w:trHeight w:val="{_tw(slot_h)}" w:hRule="exact"/></w:trPr>'
                        + "".join(tcs) + '</w:tr>')
         grid = "".join(f'<w:gridCol w:w="{_tw(slot_w)}"/>' for _ in range(cols))
-        tables.append(_w_credit(pid) + f'<w:tbl><w:tblPr><w:tblW w:w="{_tw(slot_w) * cols}" w:type="dxa"/>'
+        tables.append(f'<w:tbl><w:tblPr><w:tblW w:w="{_tw(slot_w) * cols}" w:type="dxa"/>'
                       f'<w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/>'
                       f'<w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/>'
                       f'</w:tblCellMar><w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" '
@@ -444,15 +451,21 @@ def build_docx(doc, images, tattoo):
         pid += 1
     page_break = _w_tiny('<w:r><w:rPr><w:sz w:val="2"/></w:rPr><w:br w:type="page"/></w:r>')
     orient = ' w:orient="landscape"' if s["orientation"] == "landscape" else ""
-    section = (f'<w:sectPr><w:pgSz w:w="{_tw(pw)}" w:h="{_tw(ph)}"{orient}/>'
-               f'<w:pgMar w:top="{_tw(m)}" w:right="{_tw(m)}" w:bottom="{_tw(max(0.0, m - SLACK))}" '
-               f'w:left="{_tw(m)}" w:header="0" w:footer="0" w:gutter="0"/></w:sectPr>')
+    line = lay["attribution"]
+    # The grid ends composer.FOOTER above the margin and the body may run SLACK further; the footer's
+    # line (ending its distance above the page's bottom) starts where the body stops.
+    footer = max(0.0, ph - line["top"] - line["height"])
+    section = (f'<w:sectPr><w:footerReference w:type="default" r:id="rId3"/>'
+               f'<w:pgSz w:w="{_tw(pw)}" w:h="{_tw(ph)}"{orient}/>'
+               f'<w:pgMar w:top="{_tw(m)}" w:right="{_tw(m)}" w:bottom="{_tw(m + composer.FOOTER - SLACK)}" '
+               f'w:left="{_tw(m)}" w:header="0" w:footer="{_tw(footer)}" w:gutter="0"/></w:sectPr>')
     body = page_break.join(tables) + _w_tiny() + section
     document = f'{office_clip._XML}<w:document {_W_NS}><w:body>{body}</w:body></w:document>'
-    rels = parts.xml(("styles", "styles.xml"), ("settings", "settings.xml")).replace('"../media/', '"media/')
+    rels = parts.xml(("styles", "styles.xml"), ("settings", "settings.xml"), ("footer", "footer1.xml")).replace('"../media/', '"media/')
     wml = "application/vnd.openxmlformats-officedocument.wordprocessingml"
     types = _types([("/word/document.xml", f"{wml}.document.main+xml"), ("/word/styles.xml", f"{wml}.styles+xml"),
-                    ("/word/settings.xml", f"{wml}.settings+xml")], media)
+                    ("/word/settings.xml", f"{wml}.settings+xml"), ("/word/footer1.xml", f"{wml}.footer+xml")]
+                   + _PROPS_TYPES, media)
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", types)
@@ -461,6 +474,8 @@ def build_docx(doc, images, tattoo):
         z.writestr("word/_rels/document.xml.rels", rels)
         z.writestr("word/styles.xml", _W_STYLES)
         z.writestr("word/settings.xml", _W_SETTINGS)
+        z.writestr("word/footer1.xml", _w_footer(line))
+        _write_props(z)
         for name, data in media.items():
             z.writestr("word/media/" + name, data, zipfile.ZIP_STORED if name.endswith(".png") else zipfile.ZIP_DEFLATED)
         z.writestr(DOCUMENT_PART, doc.to_json())
@@ -501,18 +516,20 @@ def _p_caption(lines, cell, sid, number):
             f'<a:lstStyle/>{"".join(paras)}</p:txBody></p:sp>')
 
 
-def _p_credit(sid):
-    paras = "".join(
-        f'<a:p><a:pPr><a:lnSpc><a:spcPts val="{round(CREDIT_LINE * PT_PER_MM * 100)}"/></a:lnSpc>'
-        f'<a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft></a:pPr>'
-        f'<a:r><a:rPr lang="en-GB" sz="{round(CREDIT_SIZE * 100)}" dirty="0">{_fill(CREDIT_COLOR)}'
-        f'<a:latin typeface="{ttf.OFFICE_FONT}"/><a:cs typeface="{ttf.OFFICE_FONT}"/></a:rPr>'
-        f'<a:t>{escape(line)}</a:t></a:r></a:p>' for line in _credit())
-    box = (*CREDIT_POS, 120, CREDIT_LINE * len(_credit()) + 1)
-    return (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name={quoteattr(tr("Credit"))}/><p:cNvSpPr txBox="1"/><p:nvPr/>'
-            f'</p:nvSpPr><p:spPr><a:xfrm>{_p_box(box)}</a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
-            f'<a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" rIns="0" bIns="0" anchor="t">'
-            f'<a:noAutofit/></a:bodyPr><a:lstStyle/>{paras}</p:txBody></p:sp>')
+def _p_attribution(line):
+    """The attribution as a locked shape of the slide master: every slide shows and prints it, but it
+    can't be selected or deleted on a slide (only in View > Slide Master)."""
+    para = (f'<a:p><a:pPr algn="ctr"><a:lnSpc><a:spcPts val="{round(line["height"] * PT_PER_MM * 100)}"/></a:lnSpc>'
+            f'<a:spcBef><a:spcPts val="0"/></a:spcBef><a:spcAft><a:spcPts val="0"/></a:spcAft></a:pPr>'
+            f'<a:r><a:rPr lang="en-GB" sz="{round(line["size"] * 100)}" dirty="0">{_fill(composer.ATTRIBUTION_COLOR)}'
+            f'<a:latin typeface="{ttf.OFFICE_FONT}"/><a:cs typeface="{ttf.OFFICE_FONT}"/></a:rPr>'
+            f'<a:t>{escape(line["text"])}</a:t></a:r></a:p>')
+    box = (line["x"], line["top"], line["width"], line["height"])
+    return (f'<p:sp><p:nvSpPr><p:cNvPr id="2" name={quoteattr(scene.APP_NAME)}/><p:cNvSpPr txBox="1"><a:spLocks '
+            f'noGrp="1" noSelect="1" noRot="1" noMove="1" noResize="1" noTextEdit="1"/></p:cNvSpPr>'
+            f'<p:nvPr userDrawn="1"/></p:nvSpPr><p:spPr><a:xfrm>{_p_box(box)}</a:xfrm><a:prstGeom prst="rect">'
+            f'<a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="square" lIns="0" tIns="0" '
+            f'rIns="0" bIns="0" anchor="ctr"><a:noAutofit/></a:bodyPr><a:lstStyle/>{para}</p:txBody></p:sp>')
 
 
 def build_pptx(doc, images, tattoo):
@@ -553,15 +570,14 @@ def build_pptx(doc, images, tattoo):
                 sid += 1
             items.append(_p_caption(cell["lines"], cell["cell"], sid, number))
             sid += 1
-        items.append(_p_credit(sid))
-        sid += 1
         tree = office_clip._EMPTY_TREE.replace('</p:spTree>', "".join(items) + '</p:spTree>')
         slides.append((f'{office_clip._XML}<p:sld {office_clip._NS}>{tree}{office_clip._NO_COLOR_MAP}</p:sld>',
                        parts.xml(("slideLayout", "../slideLayouts/slideLayout1.xml"))))
     n = len(slides)
     layout_xml = (f'{office_clip._XML}<p:sldLayout {office_clip._NS} type="blank" preserve="1">'
                   f'{office_clip._EMPTY_TREE}{office_clip._NO_COLOR_MAP}</p:sldLayout>')
-    master = (f'{office_clip._XML}<p:sldMaster {office_clip._NS}>{office_clip._EMPTY_TREE}{office_clip._COLOR_MAP}'
+    master_tree = office_clip._EMPTY_TREE.replace('</p:spTree>', _p_attribution(lay["attribution"]) + '</p:spTree>')
+    master = (f'{office_clip._XML}<p:sldMaster {office_clip._NS}>{master_tree}{office_clip._COLOR_MAP}'
               '<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst></p:sldMaster>')
     ids = "".join(f'<p:sldId id="{256 + k}" r:id="rId{k + 2}"/>' for k in range(n))
     presentation = (f'{office_clip._XML}<p:presentation {office_clip._NS}>'
@@ -577,7 +593,7 @@ def build_pptx(doc, images, tattoo):
     rel = office_clip._rels
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", _types(overrides, media))
+        z.writestr("[Content_Types].xml", _types(overrides + _PROPS_TYPES, media))
         z.writestr("_rels/.rels", _package_rels("ppt/presentation.xml"))
         z.writestr("ppt/presentation.xml", presentation)
         z.writestr("ppt/_rels/presentation.xml.rels",
@@ -593,6 +609,7 @@ def build_pptx(doc, images, tattoo):
         z.writestr("ppt/slideMasters/_rels/slideMaster1.xml.rels",
                    rel(("slideLayout", "../slideLayouts/slideLayout1.xml"), ("theme", "../theme/theme1.xml")))
         z.writestr("ppt/theme/theme1.xml", office_clip._THEME)
+        _write_props(z)
         for name, data in media.items():
             z.writestr("ppt/media/" + name, data, zipfile.ZIP_STORED if name.endswith(".png") else zipfile.ZIP_DEFLATED)
         z.writestr(DOCUMENT_PART, doc.to_json())
@@ -631,7 +648,7 @@ class _Pdf:
             extra += " /Filter /FlateDecode"
         return self.add(f"<< /Length {len(data)}{extra} >>\nstream\n".encode("latin-1") + data + b"\nendstream")
 
-    def output(self, root):
+    def output(self, root, info=None):
         out = bytearray(b"%PDF-1.7\n%\xe2\xe3\xcf\xd3\n")
         offsets = []
         for k, body in enumerate(self.objects, 1):
@@ -640,7 +657,7 @@ class _Pdf:
         xref = len(out)
         out += f"xref\n0 {len(self.objects) + 1}\n0000000000 65535 f \n".encode()
         out += b"".join(f"{o:010d} 00000 n \n".encode() for o in offsets)
-        out += f"trailer\n<< /Size {len(self.objects) + 1} /Root {root} 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode()
+        out += f"trailer\n<< /Size {len(self.objects) + 1} /Root {root} 0 R{f" /Info {info} 0 R" if info else ""} >>\nstartxref\n{xref}\n%%EOF\n".encode()
         return bytes(out)
 
 
@@ -781,11 +798,12 @@ def build_pdf(doc, images, tattoo):
                 y = page_h - _baseline(line, font) * PT_PER_MM
                 ops.append(f"BT {_rgb(TEXT_COLOR)} rg /F{2 if line['bold'] else 1} {_n(size_pt)} Tf {_n(x)} {_n(y)} Td "
                            f"{font.encode(line['text'])} Tj ET")
-        for k, text in enumerate(_credit()):
-            x = CREDIT_POS[0] * PT_PER_MM
-            y = page_h - (CREDIT_POS[1] + CREDIT_LINE * (k + 0.8)) * PT_PER_MM
-            ops.append(f"BT {_rgb(CREDIT_COLOR)} rg /F1 {_n(CREDIT_SIZE)} Tf {_n(x)} {_n(y)} Td "
-                       f"{fonts[False].encode(text)} Tj ET")
+        line, font = lay["attribution"], fonts[False]
+        width = font.font.width(line["text"], line["size"] * composer.PT)
+        x = (line["x"] + (line["width"] - width) / 2) * PT_PER_MM
+        y = page_h - _baseline(line, font) * PT_PER_MM
+        ops.append(f"BT {_rgb(composer.ATTRIBUTION_COLOR)} rg /F1 {_n(line['size'])} Tf {_n(x)} {_n(y)} Td "
+                   f"{font.encode(line['text'])} Tj ET")
         content = pdf.stream("\n".join(ops).encode("latin-1"))
         xo = " ".join(f"/{k} {v} 0 R" for k, v in xobjects.items())
         page_objs.append(pdf.add(f"<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 {_n(page_w)} {_n(page_h)}] "
@@ -806,7 +824,9 @@ def build_pdf(doc, images, tattoo):
         names.append(f"{_pdf_string(name)} {spec} 0 R")
     info = f" /Names << /EmbeddedFiles << /Names [{' '.join(sorted(names))}] >> >>"
     pdf.put(catalog, f"<< /Type /Catalog /Pages {pages_obj} 0 R{info} >>")
-    return pdf.output(catalog)
+    meta = pdf.add(f"<< /Creator {_pdf_string(CREATOR)} /Producer {_pdf_string(scene.APP_NAME)} "
+                   f"/Author {_pdf_string(scene.CONTACT)} /Subject {_pdf_string(scene.ATTRIBUTION)} >>")
+    return pdf.output(catalog, meta)
 
 
 def _ascii(text):

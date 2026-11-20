@@ -1406,6 +1406,11 @@ function drawPages() {
       }
       page.append(figure);
     }
+    const a = doc.attribution;  // the exported pages' footer line
+    const credit = el("div", { className: "line attribution", textContent: a.text });
+    Object.assign(credit.style, { left: mm(a.x), top: mm(a.top), width: mm(a.width), height: mm(a.height),
+                                  lineHeight: mm(a.height), fontSize: mm(a.size * MM_PER_PT) });
+    page.append(credit);
     holder.append(el("div", { className: "pagelabel",
       textContent: tr("Page {} of {}").replace("{}", p + 1).replace("{}", doc.pages.length) }), page);
   });

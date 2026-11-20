@@ -290,7 +290,8 @@ html, body {
 .figure:hover { background: rgba(46, 104, 196, 0.08); }
 .figure.selected { outline: 2px solid var(--active); background: rgba(46, 104, 196, 0.08); }
 .figure img { position: absolute; pointer-events: none; }
-.figure .line { position: absolute; text-align: center; white-space: nowrap; overflow: hidden; color: rgb(26, 26, 26);
+.page .attribution { color: rgb(102, 102, 102); pointer-events: none; }
+.figure .line, .page .attribution { position: absolute; text-align: center; white-space: nowrap; overflow: hidden; color: rgb(26, 26, 26);
                 font-family: "Stickman Sans", Arial, sans-serif; }
 .figure .line.bold { font-weight: bold; }
 .figure .badge { position: absolute; top: 2px; left: 2px; background: var(--active); color: #fff; font: 10px var(--font);
